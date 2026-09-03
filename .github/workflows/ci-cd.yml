@@ -76,12 +76,20 @@ jobs:
           cp -r index.html monitoring.html before-after.html loop-live.html feature-flags.json css js dist/
 
       - name: Cache-bust static assets
-        # Ties every deploy's css/js references to the commit SHA, so a
-        # browser tab that cached an older app.js/styles.css always picks
-        # up the new build instead of silently mixing old JS with new HTML.
+        # Ties every deploy's LOCAL css/js references to the commit SHA, so
+        # a browser tab that cached an older file always picks up the new
+        # build instead of silently mixing old JS with new HTML. Generic
+        # pattern (any src/href pointing at js/*.js or css/*.css) rather
+        # than a hardcoded filename list — a previous version only covered
+        # app.js and styles.css and missed globe.js entirely, letting a
+        # stale cached globe.js silently run against fresh HTML/app.js for
+        # as long as the browser kept it cached. External CDN URLs
+        # (cdnjs/jsdelivr) are untouched since they're version-pinned in
+        # the URL itself already.
         run: |
+          SHORT_SHA="${GITHUB_SHA:0:7}"
           for f in dist/*.html; do
-            sed -i "s#css/styles.css#css/styles.css?v=${GITHUB_SHA:0:7}#g; s#js/app.js#js/app.js?v=${GITHUB_SHA:0:7}#g" "$f"
+            sed -i -E "s#(src|href)=\"((js|css)/[^\"]+\.(js|css))\"#\1=\"\2?v=${SHORT_SHA}\"#g" "$f"
           done
 
       - name: Generate build metadata
