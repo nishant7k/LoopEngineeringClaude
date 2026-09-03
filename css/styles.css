@@ -93,6 +93,53 @@ body {
   text-align: center;
 }
 
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--gray);
+  display: inline-block;
+}
+.status-idle { background: var(--gray); }
+.status-connecting { background: var(--amber); animation: pulse 1s infinite; }
+.status-active { background: var(--green); animation: pulse 1.6s infinite; }
+.status-error { background: var(--red); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.status-label {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin-right: 8px;
+}
+
+.warning-banner {
+  background: #3a2f14;
+  border: 1px solid #6b551f;
+  color: var(--amber);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  margin-bottom: 14px;
+}
+
+.feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
 .footer {
   text-align: center;
   color: var(--text-dim);
