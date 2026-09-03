@@ -298,6 +298,25 @@
                   if (liveMeta.commitSha === targetSha) {
                     stepStatus.monitor = "done";
                     stepDetail.monitor = 'Confirmed live: <a href="' + PAGES_BASE + '" target="_blank" rel="noopener noreferrer">' + PAGES_BASE + "</a>";
+                  } else if (liveMeta.commitSha) {
+                    // The live site may already be showing a LATER commit —
+                    // e.g. another push/reset landed and deployed before
+                    // this one's Monitor check ran. Requiring an exact SHA
+                    // match would then wait forever for a SHA the CDN will
+                    // never show again, even though the pipeline for
+                    // targetSha genuinely succeeded. Check ancestry instead:
+                    // if targetSha is an ancestor of (or equal to) what's
+                    // live, this deploy's effect is live too.
+                    var cmpRes = await ghJson(API_BASE + "/compare/" + targetSha + "..." + liveMeta.commitSha);
+                    if (cmpRes.ok && (cmpRes.body.status === "identical" || cmpRes.body.status === "ahead")) {
+                      stepStatus.monitor = "done";
+                      stepDetail.monitor = "Confirmed live (a later commit, " + liveMeta.commitSha.slice(0, 7) +
+                        ", has since deployed too — this one's changes are included): " +
+                        '<a href="' + PAGES_BASE + '" target="_blank" rel="noopener noreferrer">' + PAGES_BASE + "</a>";
+                    } else {
+                      stepStatus.monitor = "active";
+                      stepDetail.monitor = "Deploy succeeded — waiting for Pages CDN to propagate…";
+                    }
                   } else {
                     stepStatus.monitor = "active";
                     stepDetail.monitor = "Deploy succeeded — waiting for Pages CDN to propagate…";
