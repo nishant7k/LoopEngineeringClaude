@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%9B%B0%EF%B8%8F%3C/text%3E%3C/svg%3E" />
   <title>Loop Engineering — Live Loop</title>
-  <link rel="stylesheet" href="css/styles.css?v=2d7d103" />
+  <link rel="stylesheet" href="css/styles.css?v=c5d45b1" />
 </head>
 <body>
   <header class="topbar">
@@ -298,6 +298,25 @@
                   if (liveMeta.commitSha === targetSha) {
                     stepStatus.monitor = "done";
                     stepDetail.monitor = 'Confirmed live: <a href="' + PAGES_BASE + '" target="_blank" rel="noopener noreferrer">' + PAGES_BASE + "</a>";
+                  } else if (liveMeta.commitSha) {
+                    // The live site may already be showing a LATER commit —
+                    // e.g. another push/reset landed and deployed before
+                    // this one's Monitor check ran. Requiring an exact SHA
+                    // match would then wait forever for a SHA the CDN will
+                    // never show again, even though the pipeline for
+                    // targetSha genuinely succeeded. Check ancestry instead:
+                    // if targetSha is an ancestor of (or equal to) what's
+                    // live, this deploy's effect is live too.
+                    var cmpRes = await ghJson(API_BASE + "/compare/" + targetSha + "..." + liveMeta.commitSha);
+                    if (cmpRes.ok && (cmpRes.body.status === "identical" || cmpRes.body.status === "ahead")) {
+                      stepStatus.monitor = "done";
+                      stepDetail.monitor = "Confirmed live (a later commit, " + liveMeta.commitSha.slice(0, 7) +
+                        ", has since deployed too — this one's changes are included): " +
+                        '<a href="' + PAGES_BASE + '" target="_blank" rel="noopener noreferrer">' + PAGES_BASE + "</a>";
+                    } else {
+                      stepStatus.monitor = "active";
+                      stepDetail.monitor = "Deploy succeeded — waiting for Pages CDN to propagate…";
+                    }
                   } else {
                     stepStatus.monitor = "active";
                     stepDetail.monitor = "Deploy succeeded — waiting for Pages CDN to propagate…";
