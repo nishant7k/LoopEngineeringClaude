@@ -193,6 +193,12 @@ body {
 }
 .feed-title:hover { color: var(--accent); text-decoration: underline; }
 
+.feed-location {
+  grid-column: 1 / -1;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
 .feed-hn-meta {
   color: var(--text-dim);
   font-size: 0.78rem;
