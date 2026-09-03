@@ -43,9 +43,13 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package.json') }}
 
-      - run: npm install --no-save playwright@1.62.1
+      - name: Install playwright package
+        timeout-minutes: 3
+        run: |
+          npm install --no-save --fetch-retries=4 --fetch-retry-mintimeout=2000 playwright@1.62.1
 
       - name: Install Chromium (skips download on cache hit)
+        timeout-minutes: 5
         run: npx playwright install --with-deps chromium
 
       - name: Real-browser e2e smoke test
