@@ -139,16 +139,57 @@ body {
 }
 .panel-meta .btn-small { margin-left: auto; padding: 5px 12px; font-size: 0.78rem; }
 
+.globe-wrap {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
 .globe-container {
+  flex: 1 1 auto;
   display: flex;
   justify-content: center;
   align-items: center;
   height: 320px;
-  margin-bottom: 14px;
   background: radial-gradient(circle at 50% 40%, #131a2b 0%, #0b0d12 70%);
   border: 1px solid var(--panel-border);
   border-radius: var(--radius);
   overflow: hidden;
+  cursor: grab;
+}
+.globe-container:active { cursor: grabbing; }
+
+.satellite-legend {
+  flex: 0 0 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: #171b26;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  align-self: flex-start;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.76rem;
+  color: var(--text-dim);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .globe-wrap { flex-direction: column; }
+  .satellite-legend { flex-basis: auto; flex-direction: row; flex-wrap: wrap; }
 }
 
 .warning-banner {

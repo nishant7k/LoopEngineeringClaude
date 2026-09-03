@@ -28,7 +28,10 @@ const el = {
   itemCount: document.getElementById("item-count"),
   uptime: document.getElementById("uptime"),
   sourceLabel: document.getElementById("source-label"),
+  globeWrap: document.getElementById("globe-wrap"),
   globeContainer: document.getElementById("globe-container"),
+  legendIssText: document.getElementById("legend-iss-text"),
+  legendExtra: document.getElementById("legend-extra"),
 };
 
 let state = "idle"; // idle | connecting | awaiting | active | error
@@ -85,15 +88,32 @@ function setState(next, detail) {
   }
 }
 
+function renderExtraLegend(sats) {
+  if (!el.legendExtra) return;
+  el.legendExtra.innerHTML = "";
+  sats.forEach((s) => {
+    const row = document.createElement("div");
+    row.className = "legend-row";
+    const swatch = document.createElement("span");
+    swatch.className = "legend-swatch";
+    swatch.style.background = "#" + s.color.toString(16).padStart(6, "0");
+    const label = document.createElement("span");
+    label.textContent = `${s.name} — ${s.lat.toFixed(1)}°, ${s.lon.toFixed(1)}°`;
+    row.appendChild(swatch);
+    row.appendChild(label);
+    el.legendExtra.appendChild(row);
+  });
+}
+
 function showGlobe() {
   if (!el.globeContainer || !window.IssGlobe) return;
-  el.globeContainer.hidden = false;
-  window.IssGlobe.init(el.globeContainer);
+  el.globeWrap.hidden = false;
+  window.IssGlobe.init(el.globeContainer, renderExtraLegend);
 }
 
 function hideGlobe() {
   if (!el.globeContainer) return;
-  el.globeContainer.hidden = true;
+  el.globeWrap.hidden = true;
   if (window.IssGlobe) window.IssGlobe.destroy();
 }
 
@@ -182,6 +202,7 @@ function appendIssItem(pos, locationLabel) {
   updateItemCount();
 
   if (window.IssGlobe) window.IssGlobe.setIssPosition(pos.latitude, pos.longitude);
+  if (el.legendIssText) el.legendIssText.textContent = `ISS — ${lat}°, ${lon}°`;
   return row;
 }
 
