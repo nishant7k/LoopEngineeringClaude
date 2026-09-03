@@ -3,8 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%9B%B0%EF%B8%8F%3C/text%3E%3C/svg%3E" />
   <title>Loop Engineering — Live Loop</title>
-  <link rel="stylesheet" href="css/styles.css?v=824fd70" />
+  <link rel="stylesheet" href="css/styles.css?v=8ee7b30" />
 </head>
 <body>
   <header class="topbar">
@@ -56,7 +57,8 @@
       var API_BASE = "https://api.github.com/repos/" + OWNER + "/" + REPO;
       var PAGES_BASE = "https://" + OWNER.toLowerCase() + ".github.io/" + REPO + "/";
       var TOKEN_KEY = "gh_monitoring_pat_" + OWNER + "_" + REPO; // shared with monitoring.html
-      var POLL_MS = 3000;
+      var POLL_MS = 4000;
+      var MAX_BACKOFF_MS = 30000;
 
       var STEPS = [
         { key: "plan", label: "Plan", detail: "Spec already defines the target behavior." },
@@ -79,6 +81,8 @@
       var pollTimer = null;
       var baselineSha = null;
       var targetSha = null;
+      var matchedRun = null; // cached once found, so we stop re-listing runs every poll
+      var backoffMs = POLL_MS;
       var stepStatus = {}; // key -> "pending" | "active" | "done" | "failed"
       var stepDetail = {};
 
@@ -169,50 +173,88 @@
         return job;
       }
 
+      function isTerminal() {
+        return stepStatus.monitor === "done" || stepStatus.monitor === "failed" ||
+          STEPS.some(function (s) { return stepStatus[s.key] === "failed"; });
+      }
+
+      function scheduleNext(delay) {
+        clearTimeout(pollTimer);
+        if (isTerminal()) {
+          startBtn.disabled = false;
+          startBtn.textContent = "Start watching";
+          watching = false;
+          return;
+        }
+        pollTimer = setTimeout(poll, delay);
+      }
+
+      function friendlyApiError(status, message) {
+        if (status === 403 && /rate limit/i.test(message || "")) {
+          return "GitHub API rate limit hit (60 req/hr without a token). Paste a Personal " +
+            "Access Token above and click Save, then Refresh — this pauses polling and " +
+            "backs off automatically in the meantime, it will keep retrying.";
+        }
+        return "GitHub API error " + status + ": " + (message || "unknown");
+      }
+
       async function poll() {
         try {
-          clearError();
-
-          // Step: Code/Commit/Push — has a new commit landed on main?
-          var commitRes = await ghJson(API_BASE + "/commits/main");
-          if (!commitRes.ok) {
-            showError("GitHub API error " + commitRes.status + ": " + (commitRes.body.message || "unknown"));
-            return;
-          }
-          var currentSha = commitRes.body.sha;
-
-          if (currentSha !== baselineSha && !targetSha) {
-            targetSha = currentSha;
-          }
-
-          if (targetSha) {
-            stepStatus.code = "done";
-            stepDetail.code = "New commit: " + targetSha.slice(0, 7) + " — " +
-              (commitRes.body.commit && commitRes.body.commit.message ? commitRes.body.commit.message.split("\n")[0] : "");
-          } else {
-            stepStatus.code = "active";
-            stepDetail.code = "Watching main for a new commit… (baseline " + (baselineSha || "").slice(0, 7) + ")";
-          }
-
-          if (targetSha) {
-            // Find the Actions run for that commit.
-            var runsRes = await ghJson(API_BASE + "/actions/runs?per_page=10");
-            if (!runsRes.ok) {
-              showError("GitHub API error " + runsRes.status + ": " + (runsRes.body.message || "unknown"));
-              renderStepper();
+          // Step: Code/Commit/Push — only poll commits/main until we've found the new SHA.
+          if (!targetSha) {
+            var commitRes = await ghJson(API_BASE + "/commits/main");
+            if (!commitRes.ok) {
+              showError(friendlyApiError(commitRes.status, commitRes.body.message));
+              backoffMs = Math.min(backoffMs * 2, MAX_BACKOFF_MS);
+              scheduleNext(backoffMs);
               return;
             }
-            var runs = (runsRes.body.workflow_runs || []).filter(function (r) { return r.head_sha === targetSha; });
-            var run = runs[0];
+            backoffMs = POLL_MS;
+            var currentSha = commitRes.body.sha;
+            if (currentSha !== baselineSha) {
+              targetSha = currentSha;
+              stepStatus.code = "done";
+              stepDetail.code = "New commit: " + targetSha.slice(0, 7) + " — " +
+                (commitRes.body.commit && commitRes.body.commit.message ? commitRes.body.commit.message.split("\n")[0] : "");
+            } else {
+              stepStatus.code = "active";
+              stepDetail.code = "Watching main for a new commit… (baseline " + (baselineSha || "").slice(0, 7) + ")";
+            }
+            clearError();
+          }
 
-            if (!run) {
+          if (targetSha) {
+            // Find the Actions run for that commit — only list runs until we've matched one.
+            if (!matchedRun) {
+              var runsRes = await ghJson(API_BASE + "/actions/runs?per_page=10");
+              if (!runsRes.ok) {
+                showError(friendlyApiError(runsRes.status, runsRes.body.message));
+                backoffMs = Math.min(backoffMs * 2, MAX_BACKOFF_MS);
+                scheduleNext(backoffMs);
+                return;
+              }
+              backoffMs = POLL_MS;
+              clearError();
+              var runs = (runsRes.body.workflow_runs || []).filter(function (r) { return r.head_sha === targetSha; });
+              matchedRun = runs[0] || null;
+            }
+
+            if (!matchedRun) {
               ["lint", "test", "build", "deploy"].forEach(function (k) {
                 stepStatus[k] = "active";
                 stepDetail[k] = "Waiting for the Actions run to appear…";
               });
             } else {
-              var jobsRes = await ghJson(API_BASE + "/actions/runs/" + run.id + "/jobs");
-              var jobs = (jobsRes.ok && jobsRes.body.jobs) || [];
+              var jobsRes = await ghJson(API_BASE + "/actions/runs/" + matchedRun.id + "/jobs");
+              if (!jobsRes.ok) {
+                showError(friendlyApiError(jobsRes.status, jobsRes.body.message));
+                backoffMs = Math.min(backoffMs * 2, MAX_BACKOFF_MS);
+                scheduleNext(backoffMs);
+                return;
+              }
+              backoffMs = POLL_MS;
+              clearError();
+              var jobs = jobsRes.body.jobs || [];
 
               STEPS.filter(function (s) { return s.jobName; }).forEach(function (s) {
                 var job = jobStatusFor(jobs, s.jobName);
@@ -229,7 +271,7 @@
                 } else {
                   stepStatus[s.key] = "failed";
                   stepDetail[s.key] = "Conclusion: " + job.conclusion + " — " +
-                    '<a href="' + run.html_url + '" target="_blank" rel="noopener noreferrer">view run</a>';
+                    '<a href="' + matchedRun.html_url + '" target="_blank" rel="noopener noreferrer">view run</a>';
                 }
               });
 
@@ -257,8 +299,11 @@
           }
 
           renderStepper();
+          scheduleNext(POLL_MS);
         } catch (err) {
           showError(err && err.message ? err.message : String(err));
+          backoffMs = Math.min(backoffMs * 2, MAX_BACKOFF_MS);
+          scheduleNext(backoffMs);
         }
       }
 
@@ -268,10 +313,12 @@
         startBtn.disabled = true;
         clearError();
         resetSteps();
+        matchedRun = null;
+        backoffMs = POLL_MS;
 
         var res = await ghJson(API_BASE + "/commits/main");
         if (!res.ok) {
-          showError("Could not read baseline commit: " + (res.body.message || res.status));
+          showError(friendlyApiError(res.status, res.body.message));
           startBtn.disabled = false;
           startBtn.textContent = "Start watching";
           watching = false;
@@ -284,7 +331,6 @@
 
         renderStepper();
         poll();
-        pollTimer = setInterval(poll, POLL_MS);
       }
 
       startBtn.addEventListener("click", startWatching);

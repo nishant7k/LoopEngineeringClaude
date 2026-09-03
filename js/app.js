@@ -108,18 +108,22 @@ function appendIssItem(pos) {
 
   const lat = pos.latitude.toFixed(2);
   const lon = pos.longitude.toFixed(2);
+  const altitudeM = Math.round(pos.altitude * 1000);
+  const velocityMs = pos.velocity / 3.6; // km/h -> m/s
+  const distanceSinceLastM = Math.round(velocityMs * (ITEM_INTERVAL_MS / 1000));
 
   const titleLink = document.createElement("a");
   titleLink.className = "feed-title";
   titleLink.href = `https://www.google.com/maps?q=${pos.latitude},${pos.longitude}`;
   titleLink.target = "_blank";
   titleLink.rel = "noopener noreferrer";
-  titleLink.textContent = `ISS at ${lat}°, ${lon}°`;
+  titleLink.textContent = `🛰️ ISS at ${lat}°, ${lon}°`;
 
   const metaSpan = document.createElement("span");
   metaSpan.className = "feed-hn-meta";
   metaSpan.textContent =
-    `${pos.altitude.toFixed(1)} km alt · ${Math.round(pos.velocity)} km/h · ${pos.visibility}`;
+    `${altitudeM.toLocaleString()} m alt · ${Math.round(velocityMs).toLocaleString()} m/s · ` +
+    `+${distanceSinceLastM.toLocaleString()} m since last update · ${pos.visibility}`;
 
   const relSpan = document.createElement("span");
   relSpan.className = "feed-rel";
