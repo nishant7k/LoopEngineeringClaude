@@ -114,5 +114,3 @@ open monitoring.html           # live dashboard in the browser (GitHub Actions R
 [`before-after.html`](before-after.html) shows a side-by-side comparison of
 the app before and after a loop iteration, to make the effect of the loop
 visible at a glance.
-
-<!-- rehearsal: this line proves the ask -> implement -> reset cycle works -->
