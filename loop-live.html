@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Loop Engineering — Live Loop</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Loop Engineering <span class="brand-accent">AIDLC</span></div>
+    <nav class="topnav">
+      <a href="index.html">App</a>
+      <a href="monitoring.html">Monitoring</a>
+      <a href="before-after.html">Before / After</a>
+      <a href="loop-live.html" class="active">Loop Demo</a>
+    </nav>
+  </header>
+
+  <main class="container-wide">
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h1>AIDLC loop — watch it happen live</h1>
+          <p class="source-label">Every node below is driven by the real GitHub REST API and the live Pages site — nothing here is scripted or fabricated.</p>
+        </div>
+        <button id="start-btn" class="btn btn-primary">Start watching</button>
+      </div>
+
+      <div class="mon-token-row">
+        <input id="token-input" type="password" placeholder="Optional: GitHub Personal Access Token (raises rate limit)" autocomplete="off" />
+        <button id="token-save-btn" class="btn btn-secondary btn-small">Save token</button>
+      </div>
+
+      <div id="error-banner" class="mon-error-banner" hidden role="alert"></div>
+
+      <div id="baseline-info" class="mon-token-hint" style="margin-bottom:18px;">
+        Click "Start watching", then push a commit to <code>main</code> (or ask Claude to
+        implement a change via the AIDLC loop) — each phase below lights up as it really happens.
+      </div>
+
+      <div id="stepper" class="loop-stepper"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>Loop Demo — polls api.github.com and the live Pages site directly from your browser.</span>
+  </footer>
+
+  <script>
+    (function () {
+      "use strict";
+
+      var OWNER = "nishant7k";
+      var REPO = "LoopEngineeringClaude";
+      var API_BASE = "https://api.github.com/repos/" + OWNER + "/" + REPO;
+      var PAGES_BASE = "https://" + OWNER.toLowerCase() + ".github.io/" + REPO + "/";
+      var TOKEN_KEY = "gh_monitoring_pat_" + OWNER + "_" + REPO; // shared with monitoring.html
+      var POLL_MS = 3000;
+
+      var STEPS = [
+        { key: "plan", label: "Plan", detail: "Spec already defines the target behavior." },
+        { key: "code", label: "Code · Commit · Push", detail: "Waiting for a new commit on main…" },
+        { key: "lint", label: "Lint & Design Standards", jobName: "Lint & Design Standards", detail: "Waiting for CI run…" },
+        { key: "test", label: "Test", jobName: "Test", detail: "Waiting for CI run…" },
+        { key: "build", label: "Build", jobName: "Build", detail: "Waiting for CI run…" },
+        { key: "deploy", label: "Deploy", jobName: "Deploy", detail: "Waiting for CI run…" },
+        { key: "monitor", label: "Monitor", detail: "Waiting for the live site to update…" },
+      ];
+
+      var startBtn = document.getElementById("start-btn");
+      var tokenInput = document.getElementById("token-input");
+      var tokenSaveBtn = document.getElementById("token-save-btn");
+      var errorBanner = document.getElementById("error-banner");
+      var baselineInfo = document.getElementById("baseline-info");
+      var stepperEl = document.getElementById("stepper");
+
+      var watching = false;
+      var pollTimer = null;
+      var baselineSha = null;
+      var targetSha = null;
+      var stepStatus = {}; // key -> "pending" | "active" | "done" | "failed"
+      var stepDetail = {};
+
+      function getToken() {
+        try { return localStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; }
+      }
+      function setToken(v) {
+        try { v ? localStorage.setItem(TOKEN_KEY, v) : localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+      }
+      tokenInput.value = getToken();
+      tokenSaveBtn.addEventListener("click", function () {
+        setToken(tokenInput.value.trim());
+      });
+
+      function authHeaders() {
+        var h = { Accept: "application/vnd.github+json" };
+        var t = getToken();
+        if (t) h.Authorization = "Bearer " + t;
+        return h;
+      }
+
+      function ghJson(url) {
+        return fetch(url, { headers: authHeaders() }).then(function (res) {
+          return res.json().catch(function () { return {}; }).then(function (body) {
+            return { ok: res.ok, status: res.status, body: body };
+          });
+        });
+      }
+
+      function showError(msg) {
+        errorBanner.hidden = false;
+        errorBanner.textContent = msg;
+      }
+      function clearError() {
+        errorBanner.hidden = true;
+        errorBanner.textContent = "";
+      }
+
+      function resetSteps() {
+        STEPS.forEach(function (s) {
+          stepStatus[s.key] = s.key === "plan" ? "done" : "pending";
+          stepDetail[s.key] = s.detail;
+        });
+      }
+
+      function renderStepper() {
+        stepperEl.innerHTML = "";
+        STEPS.forEach(function (s, i) {
+          var node = document.createElement("div");
+          node.className = "loop-step loop-step-" + stepStatus[s.key];
+
+          var iconEl = document.createElement("div");
+          iconEl.className = "loop-step-icon";
+          iconEl.textContent =
+            stepStatus[s.key] === "done" ? "✓" :
+            stepStatus[s.key] === "failed" ? "✗" :
+            stepStatus[s.key] === "active" ? "" : String(i + 1);
+
+          var labelEl = document.createElement("div");
+          labelEl.className = "loop-step-label";
+          labelEl.textContent = s.label;
+
+          var detailEl = document.createElement("div");
+          detailEl.className = "loop-step-detail";
+          if (/<a /.test(stepDetail[s.key])) {
+            detailEl.innerHTML = stepDetail[s.key];
+          } else {
+            detailEl.textContent = stepDetail[s.key];
+          }
+
+          node.appendChild(iconEl);
+          node.appendChild(labelEl);
+          node.appendChild(detailEl);
+          stepperEl.appendChild(node);
+
+          if (i < STEPS.length - 1) {
+            var connector = document.createElement("div");
+            connector.className = "loop-connector loop-connector-" +
+              (stepStatus[s.key] === "done" ? "done" : "pending");
+            stepperEl.appendChild(connector);
+          }
+        });
+      }
+
+      function jobStatusFor(jobs, jobName) {
+        var job = jobs.find(function (j) { return j.name === jobName; });
+        if (!job) return null;
+        return job;
+      }
+
+      async function poll() {
+        try {
+          clearError();
+
+          // Step: Code/Commit/Push — has a new commit landed on main?
+          var commitRes = await ghJson(API_BASE + "/commits/main");
+          if (!commitRes.ok) {
+            showError("GitHub API error " + commitRes.status + ": " + (commitRes.body.message || "unknown"));
+            return;
+          }
+          var currentSha = commitRes.body.sha;
+
+          if (currentSha !== baselineSha && !targetSha) {
+            targetSha = currentSha;
+          }
+
+          if (targetSha) {
+            stepStatus.code = "done";
+            stepDetail.code = "New commit: " + targetSha.slice(0, 7) + " — " +
+              (commitRes.body.commit && commitRes.body.commit.message ? commitRes.body.commit.message.split("\n")[0] : "");
+          } else {
+            stepStatus.code = "active";
+            stepDetail.code = "Watching main for a new commit… (baseline " + (baselineSha || "").slice(0, 7) + ")";
+          }
+
+          if (targetSha) {
+            // Find the Actions run for that commit.
+            var runsRes = await ghJson(API_BASE + "/actions/runs?per_page=10");
+            if (!runsRes.ok) {
+              showError("GitHub API error " + runsRes.status + ": " + (runsRes.body.message || "unknown"));
+              renderStepper();
+              return;
+            }
+            var runs = (runsRes.body.workflow_runs || []).filter(function (r) { return r.head_sha === targetSha; });
+            var run = runs[0];
+
+            if (!run) {
+              ["lint", "test", "build", "deploy"].forEach(function (k) {
+                stepStatus[k] = "active";
+                stepDetail[k] = "Waiting for the Actions run to appear…";
+              });
+            } else {
+              var jobsRes = await ghJson(API_BASE + "/actions/runs/" + run.id + "/jobs");
+              var jobs = (jobsRes.ok && jobsRes.body.jobs) || [];
+
+              STEPS.filter(function (s) { return s.jobName; }).forEach(function (s) {
+                var job = jobStatusFor(jobs, s.jobName);
+                if (!job) {
+                  stepStatus[s.key] = "active";
+                  stepDetail[s.key] = "Queued…";
+                } else if (job.status !== "completed") {
+                  stepStatus[s.key] = "active";
+                  stepDetail[s.key] = "Running… (started " + new Date(job.started_at).toLocaleTimeString() + ")";
+                } else if (job.conclusion === "success") {
+                  stepStatus[s.key] = "done";
+                  var durSec = Math.round((new Date(job.completed_at) - new Date(job.started_at)) / 1000);
+                  stepDetail[s.key] = "Succeeded in " + durSec + "s";
+                } else {
+                  stepStatus[s.key] = "failed";
+                  stepDetail[s.key] = "Conclusion: " + job.conclusion + " — " +
+                    '<a href="' + run.html_url + '" target="_blank" rel="noopener noreferrer">view run</a>';
+                }
+              });
+
+              // Monitor: only meaningful once Deploy has actually succeeded.
+              if (stepStatus.deploy === "done") {
+                var liveRes = await fetch(PAGES_BASE + "build-metadata.json?cachebust=" + Date.now());
+                if (liveRes.ok) {
+                  var liveMeta = await liveRes.json().catch(function () { return {}; });
+                  if (liveMeta.commitSha === targetSha) {
+                    stepStatus.monitor = "done";
+                    stepDetail.monitor = 'Confirmed live: <a href="' + PAGES_BASE + '" target="_blank" rel="noopener noreferrer">' + PAGES_BASE + "</a>";
+                  } else {
+                    stepStatus.monitor = "active";
+                    stepDetail.monitor = "Deploy succeeded — waiting for Pages CDN to propagate…";
+                  }
+                } else {
+                  stepStatus.monitor = "active";
+                  stepDetail.monitor = "Deploy succeeded — waiting for the live site to respond…";
+                }
+              } else if (stepStatus.deploy === "failed") {
+                stepStatus.monitor = "failed";
+                stepDetail.monitor = "Deploy failed — feature not live.";
+              }
+            }
+          }
+
+          renderStepper();
+        } catch (err) {
+          showError(err && err.message ? err.message : String(err));
+        }
+      }
+
+      async function startWatching() {
+        watching = true;
+        startBtn.textContent = "Watching…";
+        startBtn.disabled = true;
+        clearError();
+        resetSteps();
+
+        var res = await ghJson(API_BASE + "/commits/main");
+        if (!res.ok) {
+          showError("Could not read baseline commit: " + (res.body.message || res.status));
+          startBtn.disabled = false;
+          startBtn.textContent = "Start watching";
+          watching = false;
+          return;
+        }
+        baselineSha = res.body.sha;
+        targetSha = null;
+        baselineInfo.textContent = "Baseline captured at " + baselineSha.slice(0, 7) +
+          ". Now push a commit to main (or ask Claude to implement something) — watching for the next commit…";
+
+        renderStepper();
+        poll();
+        pollTimer = setInterval(poll, POLL_MS);
+      }
+
+      startBtn.addEventListener("click", startWatching);
+
+      resetSteps();
+      renderStepper();
+    })();
+  </script>
+</body>
+</html>

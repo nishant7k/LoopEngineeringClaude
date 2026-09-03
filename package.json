@@ -1,0 +1,13 @@
+{
+  "name": "loop-engineering-claude",
+  "private": true,
+  "version": "0.0.0",
+  "description": "AIDLC loop engineering PoC: real-time feed built through iterative AI-driven dev loops, with real GitHub Actions CI/CD.",
+  "scripts": {
+    "test:design": "node scripts/check-design-standards.js",
+    "test:e2e": "node tests/e2e.js index.html"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

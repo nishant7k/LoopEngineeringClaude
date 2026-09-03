@@ -82,6 +82,42 @@ IDs are copied from real `git`/`gh` output, not written in advance.
   ```
 - `monitoring.html` and `before-after.html` both verified reachable at `https://nishant7k.github.io/LoopEngineeringClaude/{monitoring,before-after}.html` (HTTP 200).
 
+## Reset infrastructure — for repeatable live-implementation demos
+
+- `demo-baseline` git tag marks a clean state (app + all demo tooling
+  present, no live-implemented feature yet). `scripts/reset-demo.sh`
+  restores the tree to exactly match it (diff-and-checkout, not
+  force-push) and pushes one visible "Reset:" commit — safe to run
+  between rehearsals or before a live talk.
+- Rationale: this lets a feature be implemented live (e.g. by asking
+  Claude directly, "implement X via the AIDLC loop") and then reset back
+  to a known-clean starting point so the exact same ask can be repeated.
+
+## Iteration 7 — real Hacker News integration (rehearsed live-implementation)
+
+- **Plan**: added to `specs/FEATURE-SPEC-realtime-feed.md` under "Iteration 7".
+- **Code**: `js/app.js` rewritten to fetch `hacker-news.firebaseio.com` for
+  real top stories instead of generating synthetic timestamps; `index.html`
+  / `css/styles.css` updated for real article rows (title link, score,
+  author, real relative time) and a "Source: Hacker News" label.
+- **CI/CD redesign (permanent, not iteration-specific)**: `.github/workflows/ci-cd.yml`
+  now has 4 named jobs — **Lint & Design Standards** (`scripts/check-design-standards.js`,
+  zero-dependency token + accessibility check), **Test** (`tests/e2e.js`, a
+  real headless-Chromium Playwright smoke test, browser binaries cached via
+  `actions/cache`), **Build**, **Deploy** — each maps 1:1 to a node in the
+  new live visualizer.
+- **New**: `loop-live.html` — a 7-node stepper (Plan · Code/Commit/Push ·
+  Lint & Design Standards · Test · Build · Deploy · Monitor) that polls the
+  real GitHub REST API (commits, Actions runs, job status) plus the live
+  Pages `build-metadata.json`, every 3s, and lights up each node the moment
+  its real signal appears. No fabricated states.
+- **Test (local)**: `node tests/e2e.js index.html` passed against the real
+  HN API before pushing; `loop-live.html` verified locally against the real
+  GitHub API (correctly captured baseline SHA `d5d25a9`, correctly showed
+  Plan done / Code watching / rest pending).
+- **Commit / Push / Build / Deploy / Monitor**: recorded live below once
+  pushed — this is the first real run of the redesigned 4-job pipeline.
+
 ---
 
 **Note on authenticity**: rows marked _pending_ are stages that require

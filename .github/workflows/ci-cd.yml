@@ -13,7 +13,47 @@ permissions:
   id-token: write
 
 jobs:
+  lint:
+    name: Lint & Design Standards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Design tokens + accessibility baseline
+        run: node scripts/check-design-standards.js
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Structural syntax gate
+        run: node --check js/app.js
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package.json') }}
+
+      - run: npm install --no-save playwright@1.62.1
+
+      - name: Install Chromium (skips download on cache hit)
+        run: npx playwright install --with-deps chromium
+
+      - name: Real-browser e2e smoke test
+        run: node tests/e2e.js index.html
+
   build:
+    name: Build
+    needs: [lint, test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,13 +62,10 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Structural test gate
-        run: node --check js/app.js
-
       - name: Assemble dist
         run: |
           mkdir -p dist
-          cp -r index.html monitoring.html before-after.html css js dist/
+          cp -r index.html monitoring.html before-after.html loop-live.html css js dist/
 
       - name: Generate build metadata
         run: |
@@ -62,6 +99,7 @@ jobs:
           path: dist/
 
   deploy:
+    name: Deploy
     needs: build
     # Guards against workflow_dispatch runs from non-main refs deploying stale content.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
