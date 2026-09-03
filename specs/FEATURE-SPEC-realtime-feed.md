@@ -59,3 +59,18 @@ concrete target and a way to tell before-state from after-state.
   labeled as such in the UI. Swapping the simulated generator for a real
   `WebSocket`/SSE source is a drop-in replacement of one function
   (`js/app.js#startFeed`) and does not change the spec above.
+
+## Iteration 7 — real data source (fulfills the note above)
+
+The simulated generator was replaced with the Hacker News public Firebase
+API (`hacker-news.firebaseio.com`, no key required, CORS-enabled):
+
+- **Connect** performs a real handshake: fetches `topstories.json`. Success
+  → `active`; a genuine network/HTTP failure → `error` (no more artificial
+  5% fail rate — the error state is only reachable for real now).
+  - Each feed item is a real story: title (links to the real article or
+    HN discussion), score, author, and a real relative timestamp derived
+    from the story's actual `time` field.
+  - Acceptance criteria 1–5 from the table above still hold; timestamps and
+  content are now real rather than synthetic, which the original spec
+  already anticipated and did not require changing.
