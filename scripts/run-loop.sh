@@ -119,8 +119,10 @@ echo "  Conclusion: $CONCLUSION"
 
 if [ "$WATCH_STATUS" -eq 0 ] && [ "$CONCLUSION" = "success" ]; then
   ok "CI/CD pipeline succeeded."
-  echo "  Live app:   $PAGES_URL"
-  echo "  (Pages deployment may take a minute or two to propagate on first run.)"
+  echo "  gh-pages branch updated by the deploy job."
+  echo "  Public Pages URL (requires a public repo, or GitHub Pro/Team/Enterprise"
+  echo "  for a private one): $PAGES_URL"
+  echo "  Demo locally instead: python3 -m http.server 8888"
   exit 0
 else
   fail "CI/CD pipeline did not succeed (conclusion: $CONCLUSION)."

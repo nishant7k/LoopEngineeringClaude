@@ -82,5 +82,7 @@ echo "$LATEST_JSON" | node -e '
   })' 2>/dev/null
 
 echo
-echo "Live app (once Pages is deployed): ${PAGES_URL}"
-echo "Live dashboard: open monitoring.html in a browser."
+echo "Public Pages URL (needs a public repo, or Pro/Team/Enterprise for a"
+echo "private one): ${PAGES_URL}"
+echo "Demo locally: python3 -m http.server 8888, then open index.html /"
+echo "monitoring.html (paste a PAT into the dashboard for a private repo)."

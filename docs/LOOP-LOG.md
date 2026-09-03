@@ -61,13 +61,21 @@ IDs are copied from real `git`/`gh` output, not written in advance.
 
 ## First real push / build / deploy — recorded live
 
-_Filled in immediately after `scripts/run-loop.sh` (or an equivalent manual
-push) completes against the real `nishant7k/LoopEngineeringClaude` repo:_
-
-- **Push commit**: —
-- **Actions run**: —
-- **Conclusion**: —
-- **Pages URL**: https://nishant7k.github.io/LoopEngineeringClaude/
+- **Repo created**: `nishant7k/LoopEngineeringClaude` via `gh repo create ... --source=. --remote=origin`, then switched to **private** at the user's request.
+- **Push commit**: `7d50771` (`git push -u origin main`) — all 8 local commits landed in one push, real history preserved.
+- **Actions run**: [33805610632](https://github.com/nishant7k/LoopEngineeringClaude/actions/runs/33805610632) — `build` (13s) and `deploy` (6s) jobs both succeeded.
+- **Conclusion**: `success`.
+- **Deploy evidence**: the `gh-pages` branch was created/updated by `peaceiris/actions-gh-pages@v4` — confirmed via `gh api repos/.../branches`.
+- **Public Pages URL**: **not available.** `gh api -X POST repos/.../pages` returned
+  `422 "Your current plan does not support GitHub Pages for this repository"` —
+  GitHub Pages requires a public repo (or GitHub Pro/Team/Enterprise) for a
+  private one. Since the repo stays private, the "Deploy" stage is real and
+  verified (the artifact does land on `gh-pages`) but has no public URL.
+- **Live demo path used instead**: `python3 -m http.server 8888` from the
+  repo root, serving `index.html` / `monitoring.html` / `before-after.html`
+  on `http://localhost:8888/`. `monitoring.html`'s optional PAT field (see
+  spec) is what makes the dashboard work at all against a private repo —
+  without a token, the GitHub API returns 404 for everything.
 
 ---
 

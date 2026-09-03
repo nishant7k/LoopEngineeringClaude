@@ -37,9 +37,31 @@ Defined in [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml):
    `build-metadata.json` (commit SHA, build time).
 3. The workflow deploys `dist/` to the `gh-pages` branch via
    `peaceiris/actions-gh-pages@v4`.
-4. GitHub Pages serves the result at:
+4. GitHub Pages would serve the result publicly — **but this repo is
+   private**, and GitHub Pages requires a public repo (or GitHub
+   Pro/Team/Enterprise) to actually go live. The build and deploy jobs both
+   run for real and the `gh-pages` branch really does get updated on every
+   push (see [`docs/LOOP-LOG.md`](docs/LOOP-LOG.md) for the first real run);
+   there just isn't a public URL while the repo stays private.
 
-   **https://nishant7k.github.io/LoopEngineeringClaude/**
+### Demoing it live without public Pages
+
+```bash
+python3 -m http.server 8888   # from the repo root
+```
+
+Then open, side by side:
+
+- `http://localhost:8888/index.html` — the real-time feed app itself.
+- `http://localhost:8888/monitoring.html` — the live Actions dashboard.
+  Since the repo is private, paste a GitHub PAT (or run `gh auth token` and
+  copy it) into the token field — otherwise the GitHub API returns 404 for
+  everything. The token is stored only in that browser's `localStorage`.
+- A terminal running `gh run watch` or `scripts/monitor-ci.sh` for the
+  CLI-side view of the same CI/CD run.
+
+That combination — local live feed, live dashboard, live Actions log — is
+the full loop visible at once, without needing a public Pages URL.
 
 ## Real GitHub integration — prerequisites
 
