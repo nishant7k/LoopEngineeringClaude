@@ -111,6 +111,12 @@ body {
 .status-connecting { background: var(--amber); animation: pulse 1s infinite; }
 .status-active { background: var(--green); animation: pulse 1.6s infinite; }
 .status-error { background: var(--red); }
+.status-awaiting {
+  background: transparent;
+  border: 2px dashed var(--text-dim);
+  width: 6px;
+  height: 6px;
+}
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }

@@ -115,8 +115,43 @@ IDs are copied from real `git`/`gh` output, not written in advance.
   HN API before pushing; `loop-live.html` verified locally against the real
   GitHub API (correctly captured baseline SHA `d5d25a9`, correctly showed
   Plan done / Code watching / rest pending).
-- **Commit / Push / Build / Deploy / Monitor**: recorded live below once
-  pushed — this is the first real run of the redesigned 4-job pipeline.
+- **Commit / Push / Build / Deploy / Monitor**: `0a7caa4`, run
+  [33808260376](https://github.com/nishant7k/LoopEngineeringClaude/actions/runs/33808260376) —
+  all 4 jobs succeeded (Test 42s, Lint 10s, Build 11s, Deploy 6s). Live site
+  verified via `curl build-metadata.json` matching the pushed SHA.
+- **Reset rehearsal**: pushed a trivial README change, watched all 4 stages
+  pass, ran `scripts/reset-demo.sh`, watched all 4 stages pass again on the
+  revert commit, confirmed `git diff demo-baseline HEAD` was empty
+  afterward. Full ask → implement → reset cycle proven end-to-end.
+- **`demo-baseline` retagged** to this state (`0a7caa4`, later moved again
+  — see iteration 8) once it was clear the CI/CD redesign and
+  `loop-live.html` needed to be permanent, not reset targets.
+
+## Iteration 8 — feature-flag gate + live ISS tracking
+
+- **Plan**: `specs/FEATURE-SPEC-realtime-feed.md` "Iteration 8".
+- **Code**: `feature-flags.json` (`liveFeed: false` by default), `js/app.js`
+  rewritten for a real `awaiting` state + live ISS polling via
+  `api.wheretheiss.at`, `index.html`/`css/styles.css` updated (dynamic
+  source label, dashed "awaiting" status dot), `tests/e2e.js` fixed to
+  serve over real HTTP instead of `file://` (relative `fetch()` of
+  `feature-flags.json` is refused entirely under `file://` by Chromium,
+  independent of CORS — this would have silently broken both local
+  double-click usage and the CI test job), `.github/workflows/ci-cd.yml`
+  gained a cache-busting step (`?v=<short-sha>` on `css/js` references in
+  every deployed HTML file) so a browser tab can never mix a cached old
+  `app.js` with a freshly deployed `index.html` again — this exact bug was
+  hit once live during rehearsal (screenshot showed old simulated-feed
+  rendering after a real deploy had already shipped the HN version).
+- **Test (local)**: `tests/e2e.js` passed against both `liveFeed: false`
+  (asserts the awaiting-state copy) and `liveFeed: true` (asserts a real
+  `.feed-title`/`.feed-hn-meta` row renders) before pushing. Manual
+  Playwright check confirmed real ISS numbers rendering (e.g. "45.09°,
+  88.99°" · "420.9 km alt · 27599 km/h · daylight").
+- **`demo-baseline` intent going forward**: this iteration, with the flag
+  at `false`, IS the baseline. Enabling the flag (`liveFeed: true`) is the
+  live-demo action; `scripts/reset-demo.sh` reverts it back to `false`.
+- **Commit / Push / Build / Deploy / Monitor**: recorded live below.
 
 ---
 

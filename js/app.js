@@ -1,17 +1,19 @@
-// Iteration 7 — real Hacker News integration (live-implemented AIDLC demo).
-// Replaces the simulated generator with the real data source the spec
-// anticipated: see specs/FEATURE-SPEC-realtime-feed.md "Explicitly out of
-// scope" — "swapping the simulated generator for a real source is a
-// drop-in replacement of one function." This is that replacement.
+// Iteration 8 — feature-flag-gated live ISS tracking.
+// The feed's real data source (International Space Station live position,
+// via wheretheiss.at — no key, CORS-enabled) is fully implemented but
+// gated behind feature-flags.json#liveFeed. While the flag is false,
+// Connect surfaces an explicit "awaiting" state instead of pretending the
+// feature doesn't exist — this is the demo hook: flipping the flag (a
+// real commit -> push -> CI -> deploy) is what the AIDLC loop does live.
+// The flag is re-fetched (cache-busted) on every Connect click, so a tab
+// left open during a live demo picks up a fresh deploy without a reload.
 
 const CONNECTING_DELAY_MS = 300;
-const ITEM_INTERVAL_MIN_MS = 900;
-const ITEM_INTERVAL_MAX_MS = 2200;
+const ITEM_INTERVAL_MS = 3500;
 const MAX_ITEMS = 200;
-const STORY_POOL_SIZE = 30;
 
-const HN_TOPSTORIES_URL = "https://hacker-news.firebaseio.com/v0/topstories.json";
-const hnItemUrl = (id) => `https://hacker-news.firebaseio.com/v0/item/${id}.json`;
+const FLAGS_URL = "./feature-flags.json";
+const ISS_URL = "https://api.wheretheiss.at/v1/satellites/25544";
 
 const el = {
   connectBtn: document.getElementById("connect-btn"),
@@ -23,16 +25,15 @@ const el = {
   warningBanner: document.getElementById("warning-banner"),
   itemCount: document.getElementById("item-count"),
   uptime: document.getElementById("uptime"),
+  sourceLabel: document.getElementById("source-label"),
 };
 
-let state = "idle"; // idle | connecting | active | error
+let state = "idle"; // idle | connecting | awaiting | active | error
 let connectTimeout = null;
 let feedTimer = null;
-let warningTimeout = null;
 let tickTimer = null;
 let itemTotal = 0;
 let connectedAt = null;
-let storyQueue = [];
 let connectGeneration = 0;
 
 function setState(next, detail) {
@@ -42,23 +43,37 @@ function setState(next, detail) {
   const labels = {
     idle: "Idle",
     connecting: "Connecting…",
-    active: "Active — live from Hacker News",
-    error: detail || "Error — could not reach Hacker News",
+    awaiting: "Awaiting feature",
+    active: "Active — live ISS tracking",
+    error: detail || "Error — could not reach the ISS API",
   };
   el.statusLabel.textContent = labels[next];
+
+  const sourceLabels = {
+    idle: "Source: not yet connected",
+    connecting: "Source: checking feature status…",
+    awaiting: "Source: not implemented yet",
+    active: "Source: ISS live position — wheretheiss.at",
+    error: "Source: unreachable",
+  };
+  if (el.sourceLabel) el.sourceLabel.textContent = sourceLabels[next];
 
   el.connectBtn.disabled = next === "connecting";
   el.connectBtn.textContent = next === "active" ? "Disconnect" : "Connect";
   el.clearBtn.disabled = itemTotal === 0;
 
-  if (next === "idle" || next === "error") {
+  if (next === "idle" || next === "error" || next === "awaiting") {
     el.emptyState.hidden = false;
     el.feedList.hidden = true;
-    el.emptyState.textContent =
-      next === "error"
-        ? "Connection failed — Hacker News API unreachable. Click Connect to retry."
-        : "Not connected. Click Connect to start the live Hacker News feed.";
     el.uptime.textContent = "not connected";
+    if (next === "awaiting") {
+      el.emptyState.textContent =
+        'This feature has not been implemented yet. Ask the AIDLC loop: "implement the live ISS tracking feed."';
+    } else if (next === "error") {
+      el.emptyState.textContent = "Connection failed — ISS API unreachable. Click Connect to retry.";
+    } else {
+      el.emptyState.textContent = "Not connected. Click Connect to start the live feed.";
+    }
   } else if (next === "active") {
     el.emptyState.hidden = true;
     el.feedList.hidden = false;
@@ -76,9 +91,7 @@ function relativeTime(epochMs) {
   const seconds = Math.max(0, Math.floor((Date.now() - epochMs) / 1000));
   if (seconds < 60) return `${seconds}s ago`;
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  return `${hours}h ago`;
+  return `${minutes}m ago`;
 }
 
 function updateItemCount() {
@@ -86,32 +99,27 @@ function updateItemCount() {
   el.clearBtn.disabled = itemTotal === 0;
 }
 
-function shuffle(arr) {
-  const a = arr.slice();
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-function appendStoryItem(story) {
+function appendIssItem(pos) {
   itemTotal += 1;
-  const epochMs = story.time * 1000;
+  const epochMs = pos.timestamp * 1000;
   const row = document.createElement("div");
   row.className = "feed-item";
   row.dataset.epoch = String(epochMs);
 
+  const lat = pos.latitude.toFixed(2);
+  const lon = pos.longitude.toFixed(2);
+
   const titleLink = document.createElement("a");
   titleLink.className = "feed-title";
-  titleLink.href = story.url || `https://news.ycombinator.com/item?id=${story.id}`;
+  titleLink.href = `https://www.google.com/maps?q=${pos.latitude},${pos.longitude}`;
   titleLink.target = "_blank";
   titleLink.rel = "noopener noreferrer";
-  titleLink.textContent = story.title || "(untitled)";
+  titleLink.textContent = `ISS at ${lat}°, ${lon}°`;
 
   const metaSpan = document.createElement("span");
   metaSpan.className = "feed-hn-meta";
-  metaSpan.textContent = `${story.score ?? 0} pts · by ${story.by || "unknown"}`;
+  metaSpan.textContent =
+    `${pos.altitude.toFixed(1)} km alt · ${Math.round(pos.velocity)} km/h · ${pos.visibility}`;
 
   const relSpan = document.createElement("span");
   relSpan.className = "feed-rel";
@@ -131,10 +139,7 @@ function appendStoryItem(story) {
 function showWarning(message) {
   el.warningBanner.hidden = false;
   el.warningBanner.textContent = message;
-  clearTimeout(warningTimeout);
-  warningTimeout = setTimeout(() => {
-    el.warningBanner.hidden = true;
-  }, 2500);
+  setTimeout(() => { el.warningBanner.hidden = true; }, 2500);
 }
 
 function tick() {
@@ -146,53 +151,45 @@ function tick() {
   }
 }
 
-async function fetchNextStory(generation) {
-  if (storyQueue.length === 0) {
-    storyQueue = shuffle(storyQueue.length ? storyQueue : []);
-  }
-  const id = storyQueue.shift();
-  if (id === undefined) return null;
-  const res = await fetch(hnItemUrl(id));
-  if (generation !== connectGeneration) return null; // connection state changed mid-fetch
-  if (!res.ok) throw new Error(`HN item fetch failed: HTTP ${res.status}`);
-  const story = await res.json();
-  return story;
-}
-
-function scheduleNextItem(generation, pool) {
-  const delay = ITEM_INTERVAL_MIN_MS + Math.random() * (ITEM_INTERVAL_MAX_MS - ITEM_INTERVAL_MIN_MS);
+function scheduleNextItem(generation) {
   feedTimer = setTimeout(async () => {
     if (state !== "active" || generation !== connectGeneration) return;
-    if (storyQueue.length === 0) {
-      storyQueue = shuffle(pool);
-    }
     try {
-      const story = await fetchNextStory(generation);
+      const res = await fetch(ISS_URL);
       if (generation !== connectGeneration) return;
-      if (story && story.title) {
-        appendStoryItem(story);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const pos = await res.json();
+      if (generation !== connectGeneration) return;
+      appendIssItem(pos);
     } catch (err) {
       if (generation !== connectGeneration) return;
-      showWarning("Transient Hacker News API error — retrying.");
+      showWarning("Transient ISS API error — retrying.");
     }
-    scheduleNextItem(generation, pool);
-  }, delay);
+    scheduleNextItem(generation);
+  }, ITEM_INTERVAL_MS);
 }
 
-function startFeed(generation, pool) {
+function startFeed(generation) {
   connectedAt = Date.now();
-  storyQueue = shuffle(pool);
-  scheduleNextItem(generation, pool);
+  scheduleNextItem(generation);
   tickTimer = setInterval(tick, 1000);
 }
 
 function stopFeed() {
   clearTimeout(feedTimer);
   clearInterval(tickTimer);
-  clearTimeout(warningTimeout);
   el.warningBanner.hidden = true;
   connectedAt = null;
+}
+
+async function fetchFlags() {
+  try {
+    const res = await fetch(`${FLAGS_URL}?cachebust=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) return {};
+    return await res.json();
+  } catch (err) {
+    return {};
+  }
 }
 
 async function connect() {
@@ -200,17 +197,24 @@ async function connect() {
   const generation = connectGeneration;
   setState("connecting");
 
+  const flags = await fetchFlags();
+  if (generation !== connectGeneration) return;
+
+  if (!flags.liveFeed) {
+    setState("awaiting");
+    return;
+  }
+
   connectTimeout = setTimeout(async () => {
     try {
-      const res = await fetch(HN_TOPSTORIES_URL);
+      const res = await fetch(ISS_URL);
       if (generation !== connectGeneration) return;
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const ids = await res.json();
+      const pos = await res.json();
       if (generation !== connectGeneration) return;
-      const pool = ids.slice(0, STORY_POOL_SIZE);
-      if (pool.length === 0) throw new Error("empty story list");
       setState("active");
-      startFeed(generation, pool);
+      appendIssItem(pos);
+      startFeed(generation);
     } catch (err) {
       if (generation !== connectGeneration) return;
       setState("error", `Error — ${err.message}`);

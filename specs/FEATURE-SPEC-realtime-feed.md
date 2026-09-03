@@ -74,3 +74,23 @@ API (`hacker-news.firebaseio.com`, no key required, CORS-enabled):
   - Acceptance criteria 1–5 from the table above still hold; timestamps and
   content are now real rather than synthetic, which the original spec
   already anticipated and did not require changing.
+
+## Iteration 8 — feature-flag gate + live ISS tracking (supersedes iteration 7's source)
+
+The data source became live ISS position (`api.wheretheiss.at`, no key,
+CORS-enabled) — real latitude/longitude/altitude/velocity/day-night
+visibility, updating every 3.5s — gated behind `feature-flags.json#liveFeed`:
+
+- **`liveFeed: false`** (repo default / `demo-baseline`): clicking Connect
+  surfaces an explicit **`awaiting`** status — distinct from `idle` — with
+  the message "This feature has not been implemented yet. Ask the AIDLC
+  loop: ...". The feature's code fully exists; it's deliberately inert.
+- **`liveFeed: true`**: Connect performs the real ISS handshake and streams
+  live position items (each linking to a Google Maps pin of that
+  coordinate).
+- The flag is re-fetched (cache-busted, `cache: "no-store"`) on every
+  Connect click — a tab left open during a live demo picks up a fresh
+  deploy without a manual reload.
+- This is the mechanism for the repeatable "ask Claude to implement it,
+  watch the loop, see it go live, then reset" demo cycle — see
+  `docs/LOOP-LOG.md` and `scripts/reset-demo.sh`.
