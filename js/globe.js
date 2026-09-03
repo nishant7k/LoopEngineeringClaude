@@ -15,6 +15,7 @@
   var lastFrameTime = null;
   var rafHandle = null;
   var targetRotationY = 0;
+  var generation = 0; // bumped on every init()/destroy() so stale async callbacks (e.g. a texture load that resolves after Disconnect) can detect they're stale and no-op instead of touching disposed state
 
   function latLonToVector3(lat, lon, radius) {
     var phi = (90 - lat) * (Math.PI / 180);
@@ -55,6 +56,8 @@
       return false;
     }
     try {
+      generation += 1;
+      var thisGeneration = generation;
       var width = containerEl.clientWidth || 320;
       var height = 320;
 
@@ -89,12 +92,14 @@
       loader.load(
         EARTH_TEXTURE_URL,
         function (texture) {
+          if (thisGeneration !== generation || !earthMaterial) return; // disposed before this resolved
           earthMaterial.map = texture;
           earthMaterial.color.set(0xffffff);
           earthMaterial.needsUpdate = true;
         },
         undefined,
         function () {
+          if (thisGeneration !== generation) return;
           console.warn("Globe: earth texture failed to load — using a flat-shaded sphere instead.");
         }
       );
@@ -152,6 +157,7 @@
   }
 
   function destroy() {
+    generation += 1; // invalidate any in-flight texture-load callbacks immediately
     ready = false;
     if (rafHandle) cancelAnimationFrame(rafHandle);
     if (renderer) renderer.dispose();
