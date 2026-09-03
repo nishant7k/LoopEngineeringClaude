@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%9B%B0%EF%B8%8F%3C/text%3E%3C/svg%3E" />
   <title>Loop Engineering — Monitoring</title>
   <link rel="stylesheet" href="css/styles.css" />
 </head>
@@ -83,7 +84,7 @@
       var REPO = "LoopEngineeringClaude";
       var API_BASE = "https://api.github.com/repos/" + OWNER + "/" + REPO;
       var TOKEN_KEY = "gh_monitoring_pat_" + OWNER + "_" + REPO;
-      var REFRESH_MS = 30000;
+      var REFRESH_MS = 45000; // conservative default to conserve the 60/hr unauthenticated GitHub API quota
       var TICK_MS = 1000;
 
       var tokenInput = document.getElementById("token-input");
@@ -327,16 +328,19 @@
         });
       }
 
+      function friendlyApiError(status, message) {
+        if (status === 403 && /rate limit/i.test(message || "")) {
+          return "GitHub API rate limit hit (60 req/hr without a token). Paste a Personal " +
+            "Access Token above and click Save Token to raise it to 5,000/hr.";
+        }
+        return "GitHub API error " + status + ": " + (message || "unknown error");
+      }
+
       function loadRuns() {
         var url = API_BASE + "/actions/runs?per_page=10";
         return ghFetch(url).then(function (result) {
           if (!result.ok) {
-            var msg =
-              "GitHub API error " +
-              result.status +
-              ": " +
-              (result.body && result.body.message ? result.body.message : "unknown error");
-            throw new Error(msg);
+            throw new Error(friendlyApiError(result.status, result.body && result.body.message));
           }
           runsData = (result.body && result.body.workflow_runs) || [];
           renderRuns();
