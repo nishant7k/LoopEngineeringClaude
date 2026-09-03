@@ -45,8 +45,12 @@ jobs:
 
       - name: Install playwright package
         timeout-minutes: 3
+        # --no-audit/--no-fund skip npm's separate advisory/funding network
+        # calls, a known cause of "npm install hangs regardless of registry
+        # retries" in CI — the actual package fetch is fast; those extra
+        # calls were the hang.
         run: |
-          npm install --no-save --fetch-retries=4 --fetch-retry-mintimeout=2000 playwright@1.62.1
+          npm install --no-save --no-audit --no-fund --fetch-retries=4 --fetch-retry-mintimeout=2000 playwright@1.62.1
 
       - name: Install Chromium (skips download on cache hit)
         timeout-minutes: 5
