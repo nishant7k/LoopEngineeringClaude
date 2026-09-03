@@ -24,6 +24,7 @@
   var TLE_CACHE_KEY = "iss_globe_tle_cache_v1";
   var TLE_CACHE_MAX_AGE_MS = 60 * 60 * 1000; // orbital elements barely change hour to hour
   var EXTRA_SAT_REFRESH_MS = 2000; // local math only — cheap, no network cost
+  var TRAIL_LENGTH = 6; // fading "comet tail" dots per tracked object
 
   var scene, camera, renderer, controls, earthGroup, issMarker, earthMaterial;
   var ready = false;
@@ -31,8 +32,43 @@
   var extraTickTimer = null;
   var generation = 0; // bumped on every init()/destroy() so stale async callbacks (a texture load or TLE fetch resolving after Disconnect) detect they're stale and no-op instead of touching disposed state
   var hasFramedInitialView = false;
-  var extraSatellites = []; // {name, color, satrec, marker}
+  var extraSatellites = []; // {name, color, satrec, marker, trail}
+  var issTrail = null;
   var legendCallback = null;
+
+  // A trail exists so real orbital motion is visible as its own thing,
+  // distinct from camera drags (which move the whole scene, marker and
+  // trail together, and can't be mistaken for the satellite itself moving
+  // once there's a visible tail stretching behind it that only grows when
+  // a NEW real position arrives, never during a drag).
+  function makeTrail(color) {
+    var dots = [];
+    for (var i = 0; i < TRAIL_LENGTH; i++) {
+      var opacity = 0.45 * (1 - i / TRAIL_LENGTH);
+      var mat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: opacity, depthTest: false });
+      var dot = new THREE.Mesh(new THREE.SphereGeometry(0.016, 8, 8), mat);
+      dot.visible = false;
+      dot.renderOrder = 997;
+      earthGroup.add(dot);
+      dots.push(dot);
+    }
+    return { dots: dots, history: [] };
+  }
+
+  function pushTrail(trail, currentLocalPos) {
+    if (!trail) return;
+    trail.history.unshift(currentLocalPos.clone());
+    if (trail.history.length > TRAIL_LENGTH) trail.history.length = TRAIL_LENGTH;
+    trail.dots.forEach(function (dot, i) {
+      var histPos = trail.history[i];
+      if (histPos) {
+        dot.position.copy(histPos);
+        dot.visible = true;
+      } else {
+        dot.visible = false;
+      }
+    });
+  }
 
   function latLonToVector3(lat, lon, radius) {
     var phi = (90 - lat) * (Math.PI / 180);
@@ -152,6 +188,7 @@
       issMarker = makeMarkerGroup(0xfff23c, 0.045, 0.13);
       issMarker.renderOrder = 999;
       earthGroup.add(issMarker);
+      issTrail = makeTrail(0xfff23c);
 
       ready = true;
       rafHandle = requestAnimationFrame(animate);
@@ -183,6 +220,7 @@
 
   function setIssPosition(lat, lon) {
     if (!ready || !issMarker) return;
+    if (issMarker.visible) pushTrail(issTrail, issMarker.position);
     var localPos = latLonToVector3(lat, lon, 1.03);
     issMarker.position.copy(localPos);
     issMarker.visible = true;
@@ -254,7 +292,8 @@
         var satrec = satellite.twoline2satrec(tle.line1, tle.line2);
         var marker = makeMarkerGroup(s.color, 0.035, 0.1);
         earthGroup.add(marker);
-        extraSatellites.push({ name: s.name, color: s.color, satrec: satrec, marker: marker });
+        var trail = makeTrail(s.color);
+        extraSatellites.push({ name: s.name, color: s.color, satrec: satrec, marker: marker, trail: trail });
       } catch (err) {
         console.warn("Globe: failed to parse TLE for " + s.name, err);
       }
@@ -276,6 +315,7 @@
         var geo = satellite.eciToGeodetic(pv.position, gmst);
         var lat = satellite.degreesLat(geo.latitude);
         var lon = satellite.degreesLong(geo.longitude);
+        if (sat.marker.visible) pushTrail(sat.trail, sat.marker.position);
         sat.marker.position.copy(latLonToVector3(lat, lon, 1.03));
         sat.marker.visible = true;
         legendData.push({ name: sat.name, color: sat.color, lat: lat, lon: lon });
@@ -296,6 +336,7 @@
     if (renderer) renderer.dispose();
     scene = camera = renderer = controls = earthGroup = issMarker = earthMaterial = null;
     extraSatellites = [];
+    issTrail = null;
     legendCallback = null;
   }
 
