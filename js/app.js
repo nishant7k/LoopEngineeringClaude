@@ -14,6 +14,8 @@ const MAX_ITEMS = 200;
 
 const FLAGS_URL = "./feature-flags.json";
 const ISS_URL = "https://api.wheretheiss.at/v1/satellites/25544";
+const geoUrl = (lat, lon) =>
+  `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`;
 
 const el = {
   connectBtn: document.getElementById("connect-btn"),
@@ -114,7 +116,27 @@ function updateItemCount() {
   el.clearBtn.disabled = itemTotal === 0;
 }
 
-function appendIssItem(pos) {
+function countryCodeToFlag(code) {
+  if (!code || code.length !== 2) return "";
+  return String.fromCodePoint(...[...code.toUpperCase()].map((c) => 127397 + c.charCodeAt(0)));
+}
+
+async function fetchLocationLabel(lat, lon) {
+  try {
+    const res = await fetch(geoUrl(lat, lon));
+    if (!res.ok) return "📍 location unavailable";
+    const data = await res.json();
+    if (data.countryName) {
+      const flag = countryCodeToFlag(data.countryCode);
+      return `${flag ? flag + " " : "📍 "}${data.countryName}`;
+    }
+    return `🌊 ${data.locality || "international waters"}`;
+  } catch (err) {
+    return "📍 location unavailable";
+  }
+}
+
+function appendIssItem(pos, locationLabel) {
   itemTotal += 1;
   const epochMs = pos.timestamp * 1000;
   const row = document.createElement("div");
@@ -134,6 +156,10 @@ function appendIssItem(pos) {
   titleLink.rel = "noopener noreferrer";
   titleLink.textContent = `🛰️ ISS at ${lat}°, ${lon}°`;
 
+  const locationSpan = document.createElement("span");
+  locationSpan.className = "feed-location";
+  locationSpan.textContent = locationLabel || "📍 locating…";
+
   const metaSpan = document.createElement("span");
   metaSpan.className = "feed-hn-meta";
   metaSpan.textContent =
@@ -145,6 +171,7 @@ function appendIssItem(pos) {
   relSpan.textContent = "just now";
 
   row.appendChild(titleLink);
+  row.appendChild(locationSpan);
   row.appendChild(metaSpan);
   row.appendChild(relSpan);
   el.feedList.prepend(row);
@@ -155,6 +182,7 @@ function appendIssItem(pos) {
   updateItemCount();
 
   if (window.IssGlobe) window.IssGlobe.setIssPosition(pos.latitude, pos.longitude);
+  return row;
 }
 
 function showWarning(message) {
@@ -172,16 +200,26 @@ function tick() {
   }
 }
 
+async function fetchIssPosition() {
+  const res = await fetch(ISS_URL);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
 function scheduleNextItem(generation) {
   feedTimer = setTimeout(async () => {
     if (state !== "active" || generation !== connectGeneration) return;
     try {
-      const res = await fetch(ISS_URL);
+      const pos = await fetchIssPosition();
       if (generation !== connectGeneration) return;
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const pos = await res.json();
-      if (generation !== connectGeneration) return;
-      appendIssItem(pos);
+      // Render immediately with position data, then fill in the location
+      // label once reverse geocoding resolves — never blocks the feed on it.
+      const row = appendIssItem(pos, null);
+      fetchLocationLabel(pos.latitude, pos.longitude).then((label) => {
+        if (generation !== connectGeneration) return;
+        const span = row.querySelector(".feed-location");
+        if (span) span.textContent = label;
+      });
     } catch (err) {
       if (generation !== connectGeneration) return;
       showWarning("Transient ISS API error — retrying.");
@@ -228,13 +266,15 @@ async function connect() {
 
   connectTimeout = setTimeout(async () => {
     try {
-      const res = await fetch(ISS_URL);
-      if (generation !== connectGeneration) return;
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const pos = await res.json();
+      const pos = await fetchIssPosition();
       if (generation !== connectGeneration) return;
       setState("active");
-      appendIssItem(pos);
+      const row = appendIssItem(pos, null);
+      fetchLocationLabel(pos.latitude, pos.longitude).then((label) => {
+        if (generation !== connectGeneration) return;
+        const span = row.querySelector(".feed-location");
+        if (span) span.textContent = label;
+      });
       startFeed(generation);
     } catch (err) {
       if (generation !== connectGeneration) return;

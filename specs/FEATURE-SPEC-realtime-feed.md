@@ -94,3 +94,21 @@ visibility, updating every 3.5s — gated behind `feature-flags.json#liveFeed`:
 - This is the mechanism for the repeatable "ask Claude to implement it,
   watch the loop, see it go live, then reset" demo cycle — see
   `docs/LOOP-LOG.md` and `scripts/reset-demo.sh`.
+
+## Iteration 9 — 3D globe visualization
+
+Added `js/globe.js` (three.js): a real earth-textured sphere alongside the
+text feed (not replacing it), the ISS plotted at its true lat/lon with a
+pulsing marker, and the globe smoothly rotating to keep the marker facing
+the camera regardless of longitude. Fails silently (console.warn only) if
+three.js/WebGL is unavailable — the text feed is unaffected either way.
+
+## Iteration 10 — reverse-geocoded location
+
+Each feed item now shows the real country (flag emoji + name) or ocean
+region the ISS is currently over, via `api.bigdatacloud.net`'s free
+keyless client reverse-geocoding endpoint (CORS-enabled, no published rate
+limit, verified with a 15-request burst test). The lookup never blocks the
+item from rendering — position/altitude/velocity appear immediately, and
+the location label fills in async, defaulting to "📍 locating…" and
+degrading to "📍 location unavailable" on failure.
