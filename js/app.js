@@ -26,6 +26,7 @@ const el = {
   itemCount: document.getElementById("item-count"),
   uptime: document.getElementById("uptime"),
   sourceLabel: document.getElementById("source-label"),
+  globeContainer: document.getElementById("globe-container"),
 };
 
 let state = "idle"; // idle | connecting | awaiting | active | error
@@ -66,6 +67,7 @@ function setState(next, detail) {
     el.emptyState.hidden = false;
     el.feedList.hidden = true;
     el.uptime.textContent = "not connected";
+    hideGlobe();
     if (next === "awaiting") {
       el.emptyState.textContent =
         'This feature has not been implemented yet. Ask the AIDLC loop: "implement the live ISS tracking feed."';
@@ -77,7 +79,20 @@ function setState(next, detail) {
   } else if (next === "active") {
     el.emptyState.hidden = true;
     el.feedList.hidden = false;
+    showGlobe();
   }
+}
+
+function showGlobe() {
+  if (!el.globeContainer || !window.IssGlobe) return;
+  el.globeContainer.hidden = false;
+  window.IssGlobe.init(el.globeContainer);
+}
+
+function hideGlobe() {
+  if (!el.globeContainer) return;
+  el.globeContainer.hidden = true;
+  if (window.IssGlobe) window.IssGlobe.destroy();
 }
 
 function formatUptime(ms) {
@@ -138,6 +153,8 @@ function appendIssItem(pos) {
     el.feedList.removeChild(el.feedList.lastChild);
   }
   updateItemCount();
+
+  if (window.IssGlobe) window.IssGlobe.setIssPosition(pos.latitude, pos.longitude);
 }
 
 function showWarning(message) {

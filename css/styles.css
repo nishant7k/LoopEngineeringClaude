@@ -139,6 +139,18 @@ body {
 }
 .panel-meta .btn-small { margin-left: auto; padding: 5px 12px; font-size: 0.78rem; }
 
+.globe-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 320px;
+  margin-bottom: 14px;
+  background: radial-gradient(circle at 50% 40%, #131a2b 0%, #0b0d12 70%);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
 .warning-banner {
   background: #3a2f14;
   border: 1px solid #6b551f;
