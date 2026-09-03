@@ -27,7 +27,14 @@
         </div>
       </div>
 
-      <div id="warning-banner" class="warning-banner" hidden></div>
+      <div class="panel-meta">
+        <span id="item-count">0 items</span>
+        <span aria-hidden="true">·</span>
+        <span id="uptime">not connected</span>
+        <button id="clear-btn" class="btn btn-secondary btn-small" disabled>Clear</button>
+      </div>
+
+      <div id="warning-banner" class="warning-banner" hidden role="status" aria-live="polite"></div>
 
       <div id="empty-state" class="placeholder-note">
         Not connected. Click Connect to start the simulated feed.
@@ -38,7 +45,7 @@
   </main>
 
   <footer class="footer">
-    <span>Iteration 3 — live stream + status indicators</span>
+    <span>Iteration 4 — feed management + polish (after state)</span>
   </footer>
 
   <script src="js/app.js"></script>

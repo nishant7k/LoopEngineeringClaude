@@ -122,6 +122,16 @@ body {
   margin-right: 8px;
 }
 
+.panel-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  margin-bottom: 14px;
+}
+.panel-meta .btn-small { margin-left: auto; padding: 5px 12px; font-size: 0.78rem; }
+
 .warning-banner {
   background: #3a2f14;
   border: 1px solid #6b551f;
