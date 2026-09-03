@@ -112,3 +112,23 @@ limit, verified with a 15-request burst test). The lookup never blocks the
 item from rendering — position/altitude/velocity appear immediately, and
 the location label fills in async, defaulting to "📍 locating…" and
 degrading to "📍 location unavailable" on failure.
+
+## Iteration 11 — 4 real tracked satellites + drag-to-rotate globe
+
+Added Hubble, Tiangong (China's space station), and a Starlink satellite
+alongside the ISS, each plotted at its true real-time position. Unlike
+ISS (polled live from `wheretheiss.at`), these 3 use orbital elements
+(TLE) fetched **once per session** from Celestrak (cached in
+`localStorage` for an hour — orbital elements barely change hour to hour)
+and propagated locally via `satellite.js` (SGP4), the same technique real
+satellite-tracking tools use — no repeated network polling for position
+updates, just local math refreshed every 2s. `OrbitControls` replaces the
+previous auto-facing-ISS camera rotation (which doesn't generalize to 4
+independent points) — the globe is now free-drag, with a color-coded
+legend beside it. Both the TLE fetch and the earth-texture load are
+guarded against a disconnect-before-resolve race (a generation counter,
+same pattern used for the connection state machine) — verified by
+aggressively connecting/disconnecting/reconnecting before either
+resolves. If satellite.js or the TLE fetch fails, the ISS marker (backed
+by a separately-proven-reliable API) keeps working; only the extra
+satellites are silently skipped.
