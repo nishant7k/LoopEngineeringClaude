@@ -140,6 +140,28 @@ body {
   overflow-y: auto;
 }
 
+.feed-item {
+  display: grid;
+  grid-template-columns: 50px 1fr auto;
+  gap: 12px;
+  padding: 8px 10px;
+  background: #171b26;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  animation: item-in 0.25s ease;
+}
+
+.feed-seq { color: var(--accent); }
+.feed-ts { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feed-rel { color: var(--text-dim); }
+
+@keyframes item-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .footer {
   text-align: center;
   color: var(--text-dim);
