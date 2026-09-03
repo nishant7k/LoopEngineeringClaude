@@ -41,6 +41,8 @@
 
       <div id="warning-banner" class="warning-banner" hidden role="status" aria-live="polite"></div>
 
+      <div id="globe-container" class="globe-container" hidden></div>
+
       <div id="empty-state" class="placeholder-note">
         Not connected. Click Connect to start the live feed.
       </div>
@@ -50,9 +52,11 @@
   </main>
 
   <footer class="footer">
-    <span>Iteration 8 — feature-flag-gated live ISS tracking</span>
+    <span>Iteration 9 — 3D globe visualization + feature-flag-gated live ISS tracking</span>
   </footer>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="js/globe.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
