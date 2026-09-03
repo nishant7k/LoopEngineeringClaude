@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Loop Engineering — Monitoring</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Loop Engineering <span class="brand-accent">AIDLC</span></div>
+    <nav class="topnav">
+      <a href="index.html">App</a>
+      <a href="monitoring.html" class="active">Monitoring</a>
+      <a href="before-after.html">Before / After</a>
+    </nav>
+  </header>
+
+  <main class="container-wide">
+    <section class="panel">
+      <div class="panel-header">
+        <h1>CI/CD monitoring — nishant7k/LoopEngineeringClaude</h1>
+      </div>
+
+      <div class="mon-token-row">
+        <input id="token-input" type="password" placeholder="Optional: GitHub Personal Access Token" autocomplete="off" />
+        <button id="token-save-btn" class="btn btn-secondary btn-small">Save token</button>
+        <button id="token-clear-btn" class="btn btn-secondary btn-small">Clear token</button>
+        <span id="token-status" class="mon-token-hint" style="margin:0;"></span>
+      </div>
+      <p class="mon-token-hint">
+        Optional — stored only in your browser (localStorage), used only for api.github.com requests.
+        Raises the 60 req/hr unauthenticated rate limit and is required for a private repo.
+      </p>
+
+      <div id="error-banner" class="mon-error-banner" hidden role="alert"></div>
+
+      <div id="pages-banner" class="mon-pages-banner" hidden></div>
+
+      <div class="mon-summary">
+        <div class="mon-stat">
+          <div class="mon-stat-label">Runs shown</div>
+          <div id="stat-total" class="mon-stat-value">—</div>
+        </div>
+        <div class="mon-stat">
+          <div class="mon-stat-label">Success</div>
+          <div id="stat-success" class="mon-stat-value green">—</div>
+        </div>
+        <div class="mon-stat">
+          <div class="mon-stat-label">Failure</div>
+          <div id="stat-failure" class="mon-stat-value red">—</div>
+        </div>
+        <div class="mon-stat">
+          <div class="mon-stat-label">Latest run</div>
+          <div id="stat-latest" class="mon-stat-value amber">—</div>
+        </div>
+      </div>
+
+      <div class="mon-toolbar">
+        <button id="refresh-btn" class="btn btn-primary btn-small">Refresh now</button>
+        <span id="loading-label" class="mon-token-hint" style="margin:0;" hidden>Loading…</span>
+        <span id="last-checked" class="mon-last-checked">Last checked: never</span>
+      </div>
+
+      <div id="empty-state" class="placeholder-note" hidden>
+        No workflow runs yet — push to main to trigger the first CI/CD run.
+      </div>
+
+      <div id="run-list" class="run-list"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>Monitoring — live GitHub REST API (api.github.com), no mocked data.</span>
+  </footer>
+
+  <script>
+    (function () {
+      "use strict";
+
+      var OWNER = "nishant7k";
+      var REPO = "LoopEngineeringClaude";
+      var API_BASE = "https://api.github.com/repos/" + OWNER + "/" + REPO;
+      var TOKEN_KEY = "gh_monitoring_pat_" + OWNER + "_" + REPO;
+      var REFRESH_MS = 30000;
+      var TICK_MS = 1000;
+
+      var tokenInput = document.getElementById("token-input");
+      var tokenSaveBtn = document.getElementById("token-save-btn");
+      var tokenClearBtn = document.getElementById("token-clear-btn");
+      var tokenStatus = document.getElementById("token-status");
+      var errorBanner = document.getElementById("error-banner");
+      var pagesBanner = document.getElementById("pages-banner");
+      var statTotal = document.getElementById("stat-total");
+      var statSuccess = document.getElementById("stat-success");
+      var statFailure = document.getElementById("stat-failure");
+      var statLatest = document.getElementById("stat-latest");
+      var refreshBtn = document.getElementById("refresh-btn");
+      var loadingLabel = document.getElementById("loading-label");
+      var lastChecked = document.getElementById("last-checked");
+      var emptyState = document.getElementById("empty-state");
+      var runList = document.getElementById("run-list");
+
+      var runsData = [];
+      var refreshTimer = null;
+      var tickTimer = null;
+
+      function getToken() {
+        try {
+          return localStorage.getItem(TOKEN_KEY) || "";
+        } catch (e) {
+          return "";
+        }
+      }
+
+      function setToken(value) {
+        try {
+          if (value) {
+            localStorage.setItem(TOKEN_KEY, value);
+          } else {
+            localStorage.removeItem(TOKEN_KEY);
+          }
+        } catch (e) {
+          /* localStorage unavailable — ignore, token just won't persist */
+        }
+      }
+
+      function initToken() {
+        var existing = getToken();
+        if (existing) {
+          tokenInput.value = existing;
+          tokenStatus.textContent = "Token loaded from this browser.";
+        }
+      }
+
+      tokenSaveBtn.addEventListener("click", function () {
+        setToken(tokenInput.value.trim());
+        tokenStatus.textContent = tokenInput.value.trim()
+          ? "Token saved to localStorage."
+          : "Token cleared.";
+        loadAll();
+      });
+
+      tokenClearBtn.addEventListener("click", function () {
+        tokenInput.value = "";
+        setToken("");
+        tokenStatus.textContent = "Token cleared.";
+        loadAll();
+      });
+
+      function authHeaders() {
+        var headers = { Accept: "application/vnd.github+json" };
+        var token = getToken();
+        if (token) {
+          headers["Authorization"] = "Bearer " + token;
+        }
+        return headers;
+      }
+
+      function ghFetch(url) {
+        return fetch(url, { headers: authHeaders() }).then(function (res) {
+          return res
+            .json()
+            .catch(function () {
+              return {};
+            })
+            .then(function (body) {
+              return { ok: res.ok, status: res.status, body: body };
+            });
+        });
+      }
+
+      function showError(message) {
+        errorBanner.textContent = message;
+        errorBanner.hidden = false;
+      }
+
+      function clearError() {
+        errorBanner.hidden = true;
+        errorBanner.textContent = "";
+      }
+
+      function fmtRelative(dateMs) {
+        var diffSec = Math.round((Date.now() - dateMs) / 1000);
+        if (diffSec < 5) return "just now";
+        if (diffSec < 60) return diffSec + "s ago";
+        var m = Math.floor(diffSec / 60);
+        if (m < 60) return m + "m ago";
+        var h = Math.floor(m / 60);
+        if (h < 24) return h + "h " + (m % 60) + "m ago";
+        var d = Math.floor(h / 24);
+        return d + "d ago";
+      }
+
+      function fmtDuration(startMs, endMs) {
+        var sec = Math.max(0, Math.round((endMs - startMs) / 1000));
+        var m = Math.floor(sec / 60);
+        var s = sec % 60;
+        if (m === 0) return s + "s";
+        return m + "m " + s + "s";
+      }
+
+      function badgeInfo(run) {
+        var status = run.status;
+        var conclusion = run.conclusion;
+        if (status === "completed") {
+          if (conclusion === "success") return { cls: "badge-success", label: "success" };
+          if (conclusion === "failure") return { cls: "badge-failure", label: "failure" };
+          if (conclusion === "cancelled") return { cls: "badge-other", label: "cancelled" };
+          return { cls: "badge-other", label: conclusion || "completed" };
+        }
+        if (status === "in_progress" || status === "queued" || status === "waiting" || status === "requested" || status === "pending") {
+          return { cls: "badge-pending", label: status.replace("_", " ") };
+        }
+        return { cls: "badge-other", label: status || "unknown" };
+      }
+
+      function renderSummary() {
+        var total = runsData.length;
+        var success = 0;
+        var failure = 0;
+        runsData.forEach(function (r) {
+          if (r.status === "completed" && r.conclusion === "success") success++;
+          if (r.status === "completed" && r.conclusion === "failure") failure++;
+        });
+        statTotal.textContent = String(total);
+        statSuccess.textContent = String(success);
+        statFailure.textContent = String(failure);
+        if (total > 0) {
+          var latest = badgeInfo(runsData[0]);
+          statLatest.textContent = latest.label;
+        } else {
+          statLatest.textContent = "—";
+        }
+      }
+
+      function renderRuns() {
+        renderSummary();
+
+        if (runsData.length === 0) {
+          emptyState.hidden = false;
+          runList.innerHTML = "";
+          return;
+        }
+        emptyState.hidden = true;
+
+        runList.innerHTML = "";
+        runsData.forEach(function (run) {
+          var row = document.createElement("div");
+          row.className = "run-row";
+
+          var badge = badgeInfo(run);
+          var startMs = new Date(run.run_started_at || run.created_at).getTime();
+          var sha = (run.head_sha || "").slice(0, 7);
+          var commitUrl = "https://github.com/" + OWNER + "/" + REPO + "/commit/" + run.head_sha;
+
+          var numberEl = document.createElement("div");
+          numberEl.className = "run-number";
+          numberEl.textContent = "#" + run.run_number;
+
+          var badgeEl = document.createElement("span");
+          badgeEl.className = "badge " + badge.cls;
+          badgeEl.textContent = badge.label;
+
+          var metaEl = document.createElement("div");
+          metaEl.className = "run-meta";
+
+          var titleEl = document.createElement("div");
+          titleEl.className = "run-title";
+          titleEl.textContent = run.name || run.display_title || run.event;
+          metaEl.appendChild(titleEl);
+
+          var shaLine = document.createElement("div");
+          shaLine.className = "run-sha";
+          var shaLink = document.createElement("a");
+          shaLink.href = commitUrl;
+          shaLink.target = "_blank";
+          shaLink.rel = "noopener noreferrer";
+          shaLink.textContent = sha || "unknown";
+          shaLine.appendChild(document.createTextNode("commit "));
+          shaLine.appendChild(shaLink);
+          metaEl.appendChild(shaLine);
+
+          var timeEl = document.createElement("div");
+          timeEl.className = "run-time";
+          var relSpan = document.createElement("span");
+          relSpan.className = "run-rel";
+          relSpan.dataset.startMs = String(startMs);
+          relSpan.textContent = fmtRelative(startMs);
+          timeEl.appendChild(relSpan);
+
+          var durSpan = document.createElement("span");
+          durSpan.className = "run-duration";
+          if (run.status === "completed" && run.updated_at) {
+            var endMs = new Date(run.updated_at).getTime();
+            durSpan.textContent = fmtDuration(startMs, endMs);
+          } else {
+            durSpan.textContent = "running…";
+          }
+          timeEl.appendChild(durSpan);
+
+          var linkEl = document.createElement("div");
+          linkEl.className = "run-link";
+          var link = document.createElement("a");
+          link.href = run.html_url;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.textContent = "View run →";
+          linkEl.appendChild(link);
+
+          row.appendChild(badgeEl);
+          row.appendChild(numberEl);
+          row.appendChild(metaEl);
+          row.appendChild(timeEl);
+          row.appendChild(linkEl);
+
+          runList.appendChild(row);
+        });
+      }
+
+      function tickRelativeTimes() {
+        var spans = runList.querySelectorAll(".run-rel");
+        spans.forEach(function (span) {
+          var startMs = Number(span.dataset.startMs);
+          span.textContent = fmtRelative(startMs);
+        });
+      }
+
+      function loadRuns() {
+        var url = API_BASE + "/actions/runs?per_page=10";
+        return ghFetch(url).then(function (result) {
+          if (!result.ok) {
+            var msg =
+              "GitHub API error " +
+              result.status +
+              ": " +
+              (result.body && result.body.message ? result.body.message : "unknown error");
+            throw new Error(msg);
+          }
+          runsData = (result.body && result.body.workflow_runs) || [];
+          renderRuns();
+        });
+      }
+
+      function loadPages() {
+        var url = API_BASE + "/pages";
+        return ghFetch(url).then(function (result) {
+          if (result.status === 404) {
+            pagesBanner.hidden = false;
+            pagesBanner.innerHTML =
+              '<span class="mon-pages-label">GitHub Pages</span>Not enabled for this repository yet.';
+            return;
+          }
+          if (!result.ok) {
+            pagesBanner.hidden = false;
+            pagesBanner.innerHTML =
+              '<span class="mon-pages-label">GitHub Pages</span>Could not load Pages status — HTTP ' +
+              result.status +
+              ": " +
+              (result.body && result.body.message ? result.body.message : "unknown error");
+            return;
+          }
+          var body = result.body || {};
+          pagesBanner.hidden = false;
+          var statusText = body.status || "unknown";
+          var url2 = body.html_url || "";
+          pagesBanner.innerHTML =
+            '<span class="mon-pages-label">GitHub Pages</span>Status: ' +
+            statusText +
+            (url2 ? ' — <a href="' + url2 + '" target="_blank" rel="noopener noreferrer">' + url2 + "</a>" : "");
+        });
+      }
+
+      function loadAll() {
+        clearError();
+        loadingLabel.hidden = false;
+        Promise.all([loadRuns(), loadPages()])
+          .catch(function (err) {
+            showError(err && err.message ? err.message : String(err));
+          })
+          .then(function () {
+            loadingLabel.hidden = true;
+            lastChecked.textContent = "Last checked: " + new Date().toLocaleTimeString();
+          });
+      }
+
+      refreshBtn.addEventListener("click", loadAll);
+
+      initToken();
+      loadAll();
+
+      refreshTimer = setInterval(loadAll, REFRESH_MS);
+      tickTimer = setInterval(tickRelativeTimes, TICK_MS);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Loop Engineering — Real-Time Feed Demo</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Loop Engineering <span class="brand-accent">AIDLC</span></div>
+    <nav class="topnav">
+      <a href="index.html" class="active">App</a>
+      <a href="monitoring.html">Monitoring</a>
+      <a href="before-after.html">Before / After</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="panel">
+      <div class="panel-header">
+        <h1>Real-time data feed</h1>
+        <div class="controls">
+          <span id="status-dot" class="status-dot status-idle" aria-hidden="true"></span>
+          <span id="status-label" class="status-label" role="status" aria-live="polite">Idle</span>
+          <button id="connect-btn" class="btn btn-primary">Connect</button>
+        </div>
+      </div>
+
+      <div class="panel-meta">
+        <span id="item-count">0 items</span>
+        <span aria-hidden="true">·</span>
+        <span id="uptime">not connected</span>
+        <button id="clear-btn" class="btn btn-secondary btn-small" disabled>Clear</button>
+      </div>
+
+      <div id="warning-banner" class="warning-banner" hidden role="status" aria-live="polite"></div>
+
+      <div id="empty-state" class="placeholder-note">
+        Not connected. Click Connect to start the simulated feed.
+      </div>
+
+      <div id="feed-list" class="feed-list" hidden></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>Iteration 4 — feed management + polish (after state)</span>
+  </footer>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
