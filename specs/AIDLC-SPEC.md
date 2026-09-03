@@ -31,7 +31,7 @@ GitHub auth is configured — see README) real Actions run IDs.
 
 - **No mocked GitHub state.** `monitoring.html` and `scripts/monitor-ci.sh`
   call the real GitHub REST API (`api.github.com`) against
-  `nishant7k/LoopEngineeringDevin`. If the repo has no runs yet, the
+  `nishant7k/LoopEngineeringClaude`. If the repo has no runs yet, the
   dashboard shows an empty state — it does not fabricate rows.
 - **No framework.** The app is plain HTML/CSS/JS so every line of the
   "after" state is inspectable without a build step getting in the way.
