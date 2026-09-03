@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%9B%B0%EF%B8%8F%3C/text%3E%3C/svg%3E" />
   <title>Loop Engineering — Before / After</title>
-  <link rel="stylesheet" href="css/styles.css?v=bc307e6" />
+  <link rel="stylesheet" href="css/styles.css?v=2d7d103" />
 </head>
 <body>
   <header class="topbar">
@@ -19,48 +19,60 @@
   </header>
 
   <main class="container">
-    <h1 style="margin: 0 0 6px; font-size: 1.3rem;">Before / After — Real-Time Feed</h1>
+    <h1 style="margin: 0 0 6px; font-size: 1.3rem;">Before / After — the live-implemented feature</h1>
     <p class="compare-intro">
-      Static snapshots of <code>index.html</code> at two points in the AIDLC loop:
-      the initial scaffold (iteration 1) and the completed feature (iteration 4).
-      Neither panel below is interactive — they are frozen reproductions for comparison.
+      This is the actual toggle used for the live demo: <code>feature-flags.json#liveFeed</code>.
+      <strong>Before</strong> is what <a href="index.html">the app</a> shows right now if the flag is
+      off — an honest "not implemented yet" state, not a placeholder. <strong>After</strong> is what
+      it shows once the flag is flipped to <code>true</code> through a real commit → push → CI → deploy
+      cycle. Both panels below are static snapshots for side-by-side reading, not live iframes — open
+      the app itself to see the current real state.
     </p>
 
     <div class="compare-grid">
       <div class="compare-col">
-        <h2>Before — commit <code>c320172</code></h2>
+        <h2>Before — <code>liveFeed: false</code></h2>
         <p class="snapshot-tag">Static snapshot, not a live iframe</p>
 
         <section class="panel" aria-label="Before-state snapshot">
           <div class="panel-header">
-            <h1>Real-time data feed</h1>
+            <div>
+              <h1>Real-time data feed</h1>
+              <p class="source-label">Source: not implemented yet</p>
+            </div>
             <div class="controls">
-              <button class="btn btn-primary" disabled aria-disabled="true">Connect</button>
+              <span class="status-dot" style="background:transparent;border:2px dashed var(--text-dim);width:6px;height:6px;" aria-hidden="true"></span>
+              <span class="status-label">Awaiting feature</span>
+              <button class="btn btn-primary">Connect</button>
             </div>
           </div>
 
           <div class="mini-note">
-            Real-time feed — not yet implemented.
+            "This feature has not been implemented yet. Ask the AIDLC loop:
+            &lsquo;implement the live ISS tracking feed.&rsquo;"
           </div>
         </section>
       </div>
 
       <div class="compare-col">
-        <h2>After — commit <code>7ecacf9</code></h2>
+        <h2>After — <code>liveFeed: true</code></h2>
         <p class="snapshot-tag">Static snapshot, not a live iframe</p>
 
         <section class="panel" aria-label="After-state snapshot">
           <div class="panel-header">
-            <h1>Real-time data feed</h1>
+            <div>
+              <h1>Real-time data feed</h1>
+              <p class="source-label">Source: ISS live position — wheretheiss.at</p>
+            </div>
             <div class="controls">
               <span class="status-dot status-active" aria-hidden="true"></span>
-              <span class="status-label">Active</span>
+              <span class="status-label">Active — live ISS tracking</span>
               <button class="btn btn-primary">Disconnect</button>
             </div>
           </div>
 
           <div class="panel-meta">
-            <span>7 items</span>
+            <span>12 items</span>
             <span aria-hidden="true">·</span>
             <span>up 0:42</span>
             <button class="btn btn-secondary btn-small">Clear</button>
@@ -68,14 +80,10 @@
 
           <div class="feed-list">
             <div class="feed-item">
-              <span class="feed-seq">#0007</span>
-              <span class="feed-ts">2026-09-03T14:22:10.482Z</span>
+              <a class="feed-title" href="#" onclick="return false">🛰️ ISS at 48.21°, 16.37°</a>
+              <span class="feed-location">🇦🇹 Austria</span>
+              <span class="feed-hn-meta">422,050 m alt · 7,660 m/s · +26,810 m since last update · daylight</span>
               <span class="feed-rel">2s ago</span>
-            </div>
-            <div class="feed-item">
-              <span class="feed-seq">#0006</span>
-              <span class="feed-ts">2026-09-03T14:22:08.117Z</span>
-              <span class="feed-rel">4s ago</span>
             </div>
           </div>
 
@@ -89,7 +97,7 @@
         <thead>
           <tr>
             <th>#</th>
-            <th>Acceptance criterion</th>
+            <th>What changes</th>
             <th>Before</th>
             <th>After</th>
           </tr>
@@ -97,31 +105,31 @@
         <tbody>
           <tr>
             <td>1</td>
-            <td>Connect button is enabled and toggles state</td>
+            <td>Connect reaches a real data source</td>
             <td class="mark-no">✗</td>
             <td class="mark-yes">✓</td>
           </tr>
           <tr>
             <td>2</td>
-            <td>Feed items appear only while active, each with a real timestamp</td>
+            <td>Real ISS position, altitude, velocity, day/night status</td>
             <td class="mark-no">✗</td>
             <td class="mark-yes">✓</td>
           </tr>
           <tr>
             <td>3</td>
-            <td>All four status states are reachable and visually distinct</td>
+            <td>Real country/region for the ISS's current position</td>
             <td class="mark-no">✗</td>
             <td class="mark-yes">✓</td>
           </tr>
           <tr>
             <td>4</td>
-            <td>Clear empties the list; item count reflects reality</td>
+            <td>3D globe with 4 real tracked satellites (ISS, Hubble, Tiangong, Starlink)</td>
             <td class="mark-no">✗</td>
             <td class="mark-yes">✓</td>
           </tr>
           <tr>
             <td>5</td>
-            <td>No console errors; works with keyboard only</td>
+            <td>Drag-to-rotate globe with fading motion trails</td>
             <td class="mark-no">✗</td>
             <td class="mark-yes">✓</td>
           </tr>
@@ -130,15 +138,16 @@
     </div>
 
     <p class="closing-note">
-      This page shows static, point-in-time snapshots for illustration. The authoritative
-      before/after diff is the real git history: <code>git diff c320172 7ecacf9 -- index.html css/styles.css js/app.js</code>
-      in this repository, and once pushed, the GitHub compare view:
-      <a href="https://github.com/nishant7k/LoopEngineeringClaude/compare/c320172...7ecacf9">https://github.com/nishant7k/LoopEngineeringClaude/compare/c320172...7ecacf9</a>
+      Unlike the earlier iterations of this demo, "before" and "after" here aren't fixed git
+      commits — they're the two states of one feature flag, toggled live. Run
+      <code>./scripts/reset-demo.sh</code> to return to "before", or ask the AIDLC loop directly to
+      flip it back to "after" — see <a href="loop-live.html">Loop Demo</a> to watch either transition
+      happen in real time, and <code>docs/LOOP-LOG.md</code> for the full iteration history.
     </p>
   </main>
 
   <footer class="footer">
-    <span>Before/After — iteration 1 vs iteration 4 of the AIDLC loop.</span>
+    <span>Before/After — the liveFeed flag, live.</span>
   </footer>
 </body>
 </html>
