@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%9B%B0%EF%B8%8F%3C/text%3E%3C/svg%3E" />
   <title>Loop Engineering — Live Loop</title>
-  <link rel="stylesheet" href="css/styles.css?v=f1d04fb" />
+  <link rel="stylesheet" href="css/styles.css?v=b0d89ba" />
 </head>
 <body>
   <header class="topbar">
@@ -57,7 +57,9 @@
       var API_BASE = "https://api.github.com/repos/" + OWNER + "/" + REPO;
       var PAGES_BASE = "https://" + OWNER.toLowerCase() + ".github.io/" + REPO + "/";
       var TOKEN_KEY = "gh_monitoring_pat_" + OWNER + "_" + REPO; // shared with monitoring.html
-      var POLL_MS = 4000;
+      var POLL_MS_AUTHED = 1500;   // with a token: 5,000 req/hr budget, poll tight
+      var POLL_MS_ANON = 4000;     // without one: stay well under 60 req/hr
+      var MONITOR_POLL_MS = 1000;  // live-site check hits github.io, not the API — free to poll fast
       var MAX_BACKOFF_MS = 30000;
 
       var STEPS = [
@@ -82,13 +84,16 @@
       var baselineSha = null;
       var targetSha = null;
       var matchedRun = null; // cached once found, so we stop re-listing runs every poll
-      var backoffMs = POLL_MS;
       var stepStatus = {}; // key -> "pending" | "active" | "done" | "failed"
       var stepDetail = {};
 
       function getToken() {
         try { return localStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; }
       }
+      function currentPollMs() {
+        return getToken() ? POLL_MS_AUTHED : POLL_MS_ANON;
+      }
+      var backoffMs = currentPollMs();
       function setToken(v) {
         try { v ? localStorage.setItem(TOKEN_KEY, v) : localStorage.removeItem(TOKEN_KEY); } catch (e) {}
       }
@@ -209,7 +214,7 @@
               scheduleNext(backoffMs);
               return;
             }
-            backoffMs = POLL_MS;
+            backoffMs = currentPollMs();
             var currentSha = commitRes.body.sha;
             if (currentSha !== baselineSha) {
               targetSha = currentSha;
@@ -233,18 +238,26 @@
                 scheduleNext(backoffMs);
                 return;
               }
-              backoffMs = POLL_MS;
+              backoffMs = currentPollMs();
               clearError();
               var runs = (runsRes.body.workflow_runs || []).filter(function (r) { return r.head_sha === targetSha; });
               matchedRun = runs[0] || null;
             }
 
+            var jobKeys = ["lint", "test", "build", "deploy"];
+            var allJobStepsTerminal = matchedRun && jobKeys.every(function (k) {
+              return stepStatus[k] === "done" || stepStatus[k] === "failed";
+            });
+
             if (!matchedRun) {
-              ["lint", "test", "build", "deploy"].forEach(function (k) {
+              jobKeys.forEach(function (k) {
                 stepStatus[k] = "active";
                 stepDetail[k] = "Waiting for the Actions run to appear…";
               });
-            } else {
+            } else if (!allJobStepsTerminal) {
+              // Nothing left to learn from /jobs once all 4 are terminal —
+              // skip re-fetching it every poll so the fast Monitor-phase
+              // cadence only ever touches the free github.io endpoint.
               var jobsRes = await ghJson(API_BASE + "/actions/runs/" + matchedRun.id + "/jobs");
               if (!jobsRes.ok) {
                 showError(friendlyApiError(jobsRes.status, jobsRes.body.message));
@@ -252,7 +265,7 @@
                 scheduleNext(backoffMs);
                 return;
               }
-              backoffMs = POLL_MS;
+              backoffMs = currentPollMs();
               clearError();
               var jobs = jobsRes.body.jobs || [];
 
@@ -274,7 +287,9 @@
                     '<a href="' + matchedRun.html_url + '" target="_blank" rel="noopener noreferrer">view run</a>';
                 }
               });
+            }
 
+            if (matchedRun) {
               // Monitor: only meaningful once Deploy has actually succeeded.
               if (stepStatus.deploy === "done") {
                 var liveRes = await fetch(PAGES_BASE + "build-metadata.json?cachebust=" + Date.now());
@@ -299,7 +314,11 @@
           }
 
           renderStepper();
-          scheduleNext(POLL_MS);
+          // Once only Monitor is left pending, the remaining work is a
+          // github.io fetch (free, not api.github.com) — poll it fast
+          // instead of waiting on the same cadence as the API calls.
+          var onlyMonitorLeft = stepStatus.deploy === "done" && stepStatus.monitor === "active";
+          scheduleNext(onlyMonitorLeft ? MONITOR_POLL_MS : currentPollMs());
         } catch (err) {
           showError(err && err.message ? err.message : String(err));
           backoffMs = Math.min(backoffMs * 2, MAX_BACKOFF_MS);
@@ -314,7 +333,7 @@
         clearError();
         resetSteps();
         matchedRun = null;
-        backoffMs = POLL_MS;
+        backoffMs = currentPollMs();
 
         var res = await ghJson(API_BASE + "/commits/main");
         if (!res.ok) {
