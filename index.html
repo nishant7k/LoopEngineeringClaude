@@ -13,13 +13,17 @@
       <a href="index.html" class="active">App</a>
       <a href="monitoring.html">Monitoring</a>
       <a href="before-after.html">Before / After</a>
+      <a href="loop-live.html">Loop Demo</a>
     </nav>
   </header>
 
   <main class="container">
     <section class="panel">
       <div class="panel-header">
-        <h1>Real-time data feed</h1>
+        <div>
+          <h1>Real-time data feed</h1>
+          <p class="source-label">Source: Hacker News — real stories, live</p>
+        </div>
         <div class="controls">
           <span id="status-dot" class="status-dot status-idle" aria-hidden="true"></span>
           <span id="status-label" class="status-label" role="status" aria-live="polite">Idle</span>
@@ -37,7 +41,7 @@
       <div id="warning-banner" class="warning-banner" hidden role="status" aria-live="polite"></div>
 
       <div id="empty-state" class="placeholder-note">
-        Not connected. Click Connect to start the simulated feed.
+        Not connected. Click Connect to start the live Hacker News feed.
       </div>
 
       <div id="feed-list" class="feed-list" hidden></div>
@@ -45,7 +49,7 @@
   </main>
 
   <footer class="footer">
-    <span>Iteration 4 — feed management + polish (after state)</span>
+    <span>Iteration 7 — real Hacker News integration (live-implemented via AIDLC loop)</span>
   </footer>
 
   <script src="js/app.js"></script>
