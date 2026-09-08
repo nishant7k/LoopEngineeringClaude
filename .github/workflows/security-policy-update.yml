@@ -1,0 +1,86 @@
+name: Security Policy Update
+
+# Iteration 4 of specs/FEATURE-SPEC-security-loop.md — the false-positive
+# feedback loop. A `/security-fp <reason>` comment on a PR appends a new
+# precedent to SECURITY-POLICY.md and opens a PR against main with that
+# change. This workflow only ever edits SECURITY-POLICY.md — never
+# application code — and the resulting PR still goes through the normal
+# human-reviewed, checks-gated merge path like any other change.
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  append-precedent:
+    if: >
+      github.event.issue.pull_request != null &&
+      startsWith(github.event.comment.body, '/security-fp')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Extract precedent text
+        id: extract
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          REASON="${COMMENT_BODY#/security-fp}"
+          REASON="$(echo "$REASON" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          if [ -z "$REASON" ]; then
+            echo "::error::No reason text supplied after /security-fp — nothing to add."
+            exit 1
+          fi
+          {
+            echo "reason<<SECFP_EOF"
+            echo "$REASON"
+            echo "SECFP_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Append precedent to SECURITY-POLICY.md
+        env:
+          REASON: ${{ steps.extract.outputs.reason }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          PR_URL: ${{ github.event.issue.pull_request.html_url }}
+        run: |
+          python3 - "$REASON" "$PR_NUMBER" "$PR_URL" <<'PYEOF'
+          import sys
+          reason, pr_number, pr_url = sys.argv[1:4]
+          path = "SECURITY-POLICY.md"
+          with open(path) as f:
+              content = f.read()
+          entry = "- **False positive from PR #{}:** {} ([source]({})).".format(
+              pr_number, reason, pr_url
+          )
+          marker = "<!-- new-precedents-appended-below -->"
+          if marker not in content:
+              sys.exit("marker not found in " + path)
+          content = content.replace(marker, entry + "\n" + marker)
+          with open(path, "w") as f:
+              f.write(content)
+          PYEOF
+
+      - name: Open PR with the new precedent
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          BRANCH="security-policy/fp-${PR_NUMBER}-${{ github.run_id }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add SECURITY-POLICY.md
+          git commit -m "Security policy: false-positive precedent from PR #${PR_NUMBER}"
+          git push origin "$BRANCH"
+          NEW_PR_URL=$(gh pr create \
+            --title "Security policy: false-positive precedent from PR #${PR_NUMBER}" \
+            --body "Appends a precedent to SECURITY-POLICY.md from a \`/security-fp\` comment on #${PR_NUMBER}. A human still reviews and merges this like any other PR — this loop only ever edits the policy doc, never application code." \
+            --base main --head "$BRANCH")
+          gh pr comment "$PR_NUMBER" --body "Opened ${NEW_PR_URL} to add this as a policy precedent."
