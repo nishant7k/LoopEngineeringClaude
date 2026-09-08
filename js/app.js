@@ -10,6 +10,7 @@
 
 const CONNECTING_DELAY_MS = 300;
 const ITEM_INTERVAL_MS = 3500;
+// Caps in-memory feed history; older entries are dropped as new ones arrive.
 const MAX_ITEMS = 200;
 
 const FLAGS_URL = "./feature-flags.json";
