@@ -1,0 +1,21 @@
+<!--
+  TEST FIXTURE — intentionally vulnerable, not part of the real app.
+  See security/eval-fixtures/README.md: exists only to verify the
+  security scanner still catches this bug class after policy edits.
+  Never linked from index.html, never bundled, never deployed.
+-->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>fixture</title></head>
+<body>
+  <div id="greeting"></div>
+  <script>
+    // Vulnerability: a URL query parameter is written directly into
+    // innerHTML with no escaping. ?name=<img src=x onerror=alert(1)>
+    // executes attacker-controlled script in the victim's browser.
+    const params = new URLSearchParams(window.location.search);
+    const name = params.get("name") || "guest";
+    document.getElementById("greeting").innerHTML = "Hello, " + name + "!";
+  </script>
+</body>
+</html>
