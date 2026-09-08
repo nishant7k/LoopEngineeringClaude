@@ -49,6 +49,13 @@ Defined in [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml):
    `gh-pages` branch keeps updating — there just won't be a public URL
    until it's public again or the plan supports it.
 
+### Security review
+
+Defined in [`.github/workflows/security-review.yml`](.github/workflows/security-review.yml):
+every pull request is scanned by [`anthropics/claude-code-security-review`](https://github.com/anthropics/claude-code-security-review),
+an AI-powered, diff-aware security reviewer that comments findings directly
+on the PR.
+
 ### Watching the loop live
 
 Open, side by side:
