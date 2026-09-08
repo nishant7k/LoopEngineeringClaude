@@ -58,6 +58,36 @@
         </div>
       </div>
 
+      <div class="panel-header" style="margin-top: 1.5rem;">
+        <h2 style="font-size: 1rem; margin: 0;">Security review loop</h2>
+      </div>
+      <p class="mon-token-hint">
+        Same <code>/actions/runs</code> data above, filtered to the
+        <code>Security Review</code> workflow — see
+        <a href="https://github.com/nishant7k/LoopEngineeringClaude/blob/main/SECURITY-POLICY.md" target="_blank" rel="noopener noreferrer">SECURITY-POLICY.md</a>
+        and <code>specs/FEATURE-SPEC-security-loop.md</code>. A run that
+        completes in a few seconds is worth a manual look at its log —
+        that's the signature of the cache-skip PR #1 hit, not a real scan.
+      </p>
+      <div class="mon-summary">
+        <div class="mon-stat">
+          <div class="mon-stat-label">Scans shown</div>
+          <div id="sec-stat-total" class="mon-stat-value">—</div>
+        </div>
+        <div class="mon-stat">
+          <div class="mon-stat-label">Pass</div>
+          <div id="sec-stat-pass" class="mon-stat-value green">—</div>
+        </div>
+        <div class="mon-stat">
+          <div class="mon-stat-label">Fail</div>
+          <div id="sec-stat-fail" class="mon-stat-value red">—</div>
+        </div>
+        <div class="mon-stat">
+          <div class="mon-stat-label">Latest scan</div>
+          <div id="sec-stat-latest" class="mon-stat-value amber">—</div>
+        </div>
+      </div>
+
       <div class="mon-toolbar">
         <button id="refresh-btn" class="btn btn-primary btn-small">Refresh now</button>
         <span id="loading-label" class="mon-token-hint" style="margin:0;" hidden>Loading…</span>
@@ -86,6 +116,7 @@
       var TOKEN_KEY = "gh_monitoring_pat_" + OWNER + "_" + REPO;
       var REFRESH_MS = 45000; // conservative default to conserve the 60/hr unauthenticated GitHub API quota
       var TICK_MS = 1000;
+      var SECURITY_WORKFLOW_NAME = "Security Review"; // name: in .github/workflows/security-review.yml
 
       var tokenInput = document.getElementById("token-input");
       var tokenSaveBtn = document.getElementById("token-save-btn");
@@ -97,6 +128,10 @@
       var statSuccess = document.getElementById("stat-success");
       var statFailure = document.getElementById("stat-failure");
       var statLatest = document.getElementById("stat-latest");
+      var secStatTotal = document.getElementById("sec-stat-total");
+      var secStatPass = document.getElementById("sec-stat-pass");
+      var secStatFail = document.getElementById("sec-stat-fail");
+      var secStatLatest = document.getElementById("sec-stat-latest");
       var refreshBtn = document.getElementById("refresh-btn");
       var loadingLabel = document.getElementById("loading-label");
       var lastChecked = document.getElementById("last-checked");
@@ -233,6 +268,24 @@
           statLatest.textContent = latest.label;
         } else {
           statLatest.textContent = "—";
+        }
+
+        var secRuns = runsData.filter(function (r) {
+          return r.name === SECURITY_WORKFLOW_NAME;
+        });
+        var secPass = 0;
+        var secFail = 0;
+        secRuns.forEach(function (r) {
+          if (r.status === "completed" && r.conclusion === "success") secPass++;
+          if (r.status === "completed" && r.conclusion === "failure") secFail++;
+        });
+        secStatTotal.textContent = String(secRuns.length);
+        secStatPass.textContent = String(secPass);
+        secStatFail.textContent = String(secFail);
+        if (secRuns.length > 0) {
+          secStatLatest.textContent = badgeInfo(secRuns[0]).label;
+        } else {
+          secStatLatest.textContent = "—";
         }
       }
 
