@@ -20,3 +20,8 @@ jobs:
         with:
           comment-pr: true
           claude-api-key: ${{ secrets.CLAUDE_API_KEY }}
+          # SECURITY-POLICY.md is this repo's threat model (see the file
+          # itself, and specs/FEATURE-SPEC-security-loop.md) — fed to the
+          # scanner as both context and false-positive filtering guidance.
+          custom-security-scan-instructions: SECURITY-POLICY.md
+          false-positive-filtering-instructions: SECURITY-POLICY.md

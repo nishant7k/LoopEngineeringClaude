@@ -23,9 +23,12 @@ is auditable after the fact — nothing here is narrated without evidence.
 
 The loop is not linear-once: it repeats. Each pass through Code → Test →
 Commit → Push → Build → Deploy → Monitor is one "iteration," and the
-iterations for the real-time data feed feature are logged in
-[`docs/LOOP-LOG.md`](../docs/LOOP-LOG.md) with real commit SHAs and (once
-GitHub auth is configured — see README) real Actions run IDs.
+iterations for each feature under the loop — the real-time data feed
+([`specs/FEATURE-SPEC-realtime-feed.md`](FEATURE-SPEC-realtime-feed.md))
+and the security review loop
+([`specs/FEATURE-SPEC-security-loop.md`](FEATURE-SPEC-security-loop.md)) —
+are logged in [`docs/LOOP-LOG.md`](../docs/LOOP-LOG.md) with real commit
+SHAs and real Actions run IDs.
 
 ## Non-negotiables for this PoC
 
