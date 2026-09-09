@@ -39,7 +39,7 @@ jobs:
           node-version: '20'
 
       - name: Structural syntax gate
-        run: node --check js/app.js
+        run: node --check src/js/app.js
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -83,7 +83,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Real-browser e2e smoke test
-        run: node tests/e2e.js index.html
+        run: node tests/e2e.js src/index.html
 
   build:
     name: Build
@@ -97,9 +97,11 @@ jobs:
           node-version: '20'
 
       - name: Assemble dist
+        # Source lives under src/ but deploys flat, so live URLs
+        # (nishant7k.github.io/.../monitoring.html etc.) never change.
         run: |
           mkdir -p dist
-          cp -r index.html monitoring.html before-after.html loop-live.html feature-flags.json css js dist/
+          cp -r src/index.html src/monitoring.html src/before-after.html src/loop-live.html src/feature-flags.json src/css src/js dist/
 
       - name: Cache-bust static assets
         # Ties every deploy's LOCAL css/js references to the commit SHA, so

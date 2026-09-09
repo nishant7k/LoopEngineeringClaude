@@ -25,12 +25,12 @@ REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
 cd "$REPO_ROOT" || exit 1
 
 # --- 1. Fast local test gate -------------------------------------------------
-bold "==> Test gate: node --check js/app.js"
-if ! node --check js/app.js; then
-  fail "js/app.js failed syntax check. Aborting loop before commit/push."
+bold "==> Test gate: node --check src/js/app.js"
+if ! node --check src/js/app.js; then
+  fail "src/js/app.js failed syntax check. Aborting loop before commit/push."
   exit 1
 fi
-ok "js/app.js syntax check passed."
+ok "src/js/app.js syntax check passed."
 
 # --- 2. Stage changes ---------------------------------------------------------
 git add -A

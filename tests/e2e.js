@@ -9,7 +9,7 @@
 // file:// scheme entirely, regardless of CORS — this would otherwise
 // surface as a spurious console error on every run.
 //
-// Usage: node tests/e2e.js [path-to-index.html]
+// Usage: node tests/e2e.js [path-to-index.html]  (default: src/index.html)
 
 const { chromium } = require("playwright");
 const path = require("path");
@@ -37,7 +37,7 @@ function startServer(root) {
 }
 
 async function main() {
-  const target = process.argv[2] || "index.html";
+  const target = process.argv[2] || "src/index.html";
   const root = path.resolve(path.dirname(target));
   const server = await startServer(root);
   const port = server.address().port;
