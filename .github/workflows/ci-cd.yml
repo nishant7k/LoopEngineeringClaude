@@ -167,3 +167,35 @@ jobs:
         with:
           publish_dir: ./dist
           github_token: ${{ secrets.GITHUB_TOKEN }}
+
+  update-log:
+    name: Update Loop Log
+    needs: deploy
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Regenerate auto-log table
+        run: node scripts/update-loop-log.js
+
+      - name: Commit if changed
+        # [skip ci] on the commit message stops this push from triggering
+        # another workflow run — without it, this job would try to log
+        # its own commit, forever.
+        run: |
+          git config user.name "loop-engineering-bot"
+          git config user.email "actions@users.noreply.github.com"
+          if git diff --quiet -- docs/LOOP-LOG.md; then
+            echo "LOOP-LOG.md already current — nothing to commit."
+          else
+            git add docs/LOOP-LOG.md
+            git commit -m "docs: auto-update LOOP-LOG.md commit history [skip ci]"
+            git push origin HEAD:main
+          fi
