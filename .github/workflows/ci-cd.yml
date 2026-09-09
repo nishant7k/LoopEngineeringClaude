@@ -58,16 +58,25 @@ jobs:
           npm install --no-save --no-audit --no-fund --fetch-retries=4 --fetch-retry-mintimeout=2000 playwright@1.62.1
 
       - name: Remove unneeded Google Chrome apt source
-        # The runner image pre-registers a Google Chrome apt source (for
-        # its own pre-installed Chrome) that Playwright's --with-deps
-        # doesn't need — it downloads Chromium separately from Playwright's
-        # own CDN, this source only supplies OS-level shared-lib deps from
-        # Ubuntu's own repos. apt-get update still touches this source, and
-        # a transient desync between it and Google's mirror ("Hash Sum
-        # mismatch" on dl.google.com/linux/chrome-stable) fails the whole
-        # install even though nothing here needs the package it serves.
-        # Removing it removes that failure mode entirely.
-        run: sudo rm -f /etc/apt/sources.list.d/google-chrome*.list
+        # The runner image registers a Google Chrome apt source (for its
+        # own pre-installed Chrome) that Playwright's --with-deps doesn't
+        # need — it downloads Chromium separately from Playwright's own
+        # CDN, this source only supplies OS-level shared-lib deps from
+        # Ubuntu's own repos. apt-get update still touches it, and a
+        # transient desync with Google's mirror ("Hash Sum mismatch" on
+        # dl.google.com/linux/chrome-stable) fails the whole install even
+        # though nothing here needs the package it serves. Grep by content
+        # rather than a guessed filename/extension (.list vs the newer
+        # deb822 .sources format) so this doesn't silently no-op again.
+        run: |
+          echo "Before:" && ls -la /etc/apt/sources.list.d/
+          MATCHES=$(sudo grep -rl "dl.google.com" /etc/apt/sources.list.d/ 2>/dev/null || true)
+          if [ -z "$MATCHES" ]; then
+            echo "No apt source file references dl.google.com — nothing to remove."
+          else
+            echo "$MATCHES" | xargs -r sudo rm -fv
+          fi
+          echo "After:" && ls -la /etc/apt/sources.list.d/
 
       - name: Install Chromium (skips download on cache hit)
         timeout-minutes: 5
