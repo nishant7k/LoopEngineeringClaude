@@ -110,7 +110,11 @@
       }
 
       function ghJson(url) {
-        return fetch(url, { headers: authHeaders() }).then(function (res) {
+        // GitHub's API sends Cache-Control: max-age=60 on these endpoints —
+        // without cache: 'no-store', the BROWSER's own HTTP cache serves a
+        // stale response for up to 60s regardless of how often this polls,
+        // which is what made the dashboard look stuck at a finished stage.
+        return fetch(url, { headers: authHeaders(), cache: "no-store" }).then(function (res) {
           return res.json().catch(function () { return {}; }).then(function (body) {
             return { ok: res.ok, status: res.status, body: body };
           });
