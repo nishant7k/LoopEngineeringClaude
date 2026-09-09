@@ -66,9 +66,9 @@
         { key: "plan", label: "Plan", detail: "Spec already defines the target behavior." },
         { key: "code", label: "Code · Commit · Push", detail: "Waiting for a new commit…" },
         { key: "pr", label: "Pull Request", detail: "Waiting for a PR against main…" },
-        { key: "lint", label: "Lint & Design Standards", checkName: "Lint & Design Standards", jobName: "Lint & Design Standards", detail: "Waiting for checks…" },
-        { key: "test", label: "Test", checkName: "Test", jobName: "Test", detail: "Waiting for checks…" },
-        { key: "security", label: "Security Review", checkName: "security", detail: "Waiting for checks…" },
+        { key: "lint", label: "Lint & Design Standards", checkName: "Lint & Design Standards", jobName: "Lint & Design Standards", detail: "Waiting for checks…", group: "checks" },
+        { key: "test", label: "Test", checkName: "Test", jobName: "Test", detail: "Waiting for checks…", group: "checks" },
+        { key: "security", label: "Security Review", checkName: "security", detail: "Waiting for checks…", group: "checks" },
         { key: "gate", label: "Gate — Merge", detail: "Waiting for all checks to pass…" },
         { key: "build", label: "Build", jobName: "Build", detail: "Waiting for CI run…" },
         { key: "deploy", label: "Deploy", jobName: "Deploy", detail: "Waiting for CI run…" },
@@ -85,7 +85,13 @@
       var watching = false;
       var pollTimer = null;
       var baselineSha = null;
-      var baselineTime = null;
+      // PR numbers that already existed when watching started — anything not
+      // in this set is "new". Deliberately NOT a timestamp comparison: that
+      // used to compare the browser's clock against GitHub's server clock
+      // (Date.now() vs. a PR's created_at), which is fragile to client clock
+      // drift and to background-tab timer throttling delaying when this gets
+      // checked at all. Comparing PR numbers needs no clock at all.
+      var baselinePrNumbers = null;
       var mode = null; // "pr" | "direct" — decided by whichever appears first
       var prNumber = null;
       var prHeadSha = null;
@@ -150,45 +156,131 @@
         });
       }
 
+      function iconFor(status, ordinal) {
+        return status === "done" ? "✓" :
+          status === "skipped" ? "–" :
+          status === "failed" ? "✗" :
+          status === "active" ? "" : String(ordinal);
+      }
+
+      function groupStatus(members) {
+        var statuses = members.map(function (m) { return stepStatus[m.key]; });
+        if (statuses.some(function (v) { return v === "failed"; })) return "failed";
+        if (statuses.every(function (v) { return v === "skipped"; })) return "skipped";
+        if (statuses.every(function (v) { return v === "done" || v === "skipped"; })) return "done";
+        if (statuses.every(function (v) { return v === "pending"; })) return "pending";
+        return "active";
+      }
+
+      function fillDetail(el, text) {
+        if (/<a /.test(text)) { el.innerHTML = text; } else { el.textContent = text; }
+      }
+
+      // Lint, Test, and Security are three genuinely independent things:
+      // Lint/Test are separate jobs in ci-cd.yml with no dependency between
+      // them, and Security is a whole separate workflow (security-review.yml)
+      // that starts in parallel with ci-cd.yml, not after it. Rendering them
+      // as one box with three simultaneous rows says that honestly, instead
+      // of a straight left-to-right chain implying Lint finishes, then Test
+      // starts, then Security starts — which is not what the YAML does.
       function renderStepper() {
         stepperEl.innerHTML = "";
-        STEPS.forEach(function (s, i) {
-          var node = document.createElement("div");
-          node.className = "loop-step loop-step-" + stepStatus[s.key];
+        var ordinal = 0;
 
-          var iconEl = document.createElement("div");
-          iconEl.className = "loop-step-icon";
-          iconEl.textContent =
-            stepStatus[s.key] === "done" ? "✓" :
-            stepStatus[s.key] === "skipped" ? "–" :
-            stepStatus[s.key] === "failed" ? "✗" :
-            stepStatus[s.key] === "active" ? "" : String(i + 1);
+        var i = 0;
+        while (i < STEPS.length) {
+          var s = STEPS[i];
+          var isLastBox;
 
-          var labelEl = document.createElement("div");
-          labelEl.className = "loop-step-label";
-          labelEl.textContent = s.label;
+          if (s.group) {
+            var members = [];
+            var j = i;
+            while (j < STEPS.length && STEPS[j].group === s.group) { members.push(STEPS[j]); j++; }
+            var gStatus = groupStatus(members);
+            ordinal++;
 
-          var detailEl = document.createElement("div");
-          detailEl.className = "loop-step-detail";
-          if (/<a /.test(stepDetail[s.key])) {
-            detailEl.innerHTML = stepDetail[s.key];
+            var node = document.createElement("div");
+            node.className = "loop-step loop-step-group loop-step-" + gStatus;
+
+            var iconEl = document.createElement("div");
+            iconEl.className = "loop-step-icon";
+            iconEl.textContent = iconFor(gStatus, ordinal);
+            node.appendChild(iconEl);
+
+            var labelEl = document.createElement("div");
+            labelEl.className = "loop-step-label";
+            labelEl.textContent = "PR Checks (run in parallel)";
+            node.appendChild(labelEl);
+
+            var subgrid = document.createElement("div");
+            subgrid.className = "loop-substep-grid";
+            members.forEach(function (m) {
+              var sub = document.createElement("div");
+              sub.className = "loop-substep loop-substep-" + stepStatus[m.key];
+              var subIcon = document.createElement("span");
+              subIcon.className = "loop-substep-icon";
+              subIcon.textContent = stepStatus[m.key] === "done" ? "✓" :
+                stepStatus[m.key] === "skipped" ? "–" :
+                stepStatus[m.key] === "failed" ? "✗" :
+                stepStatus[m.key] === "active" ? "…" : "○";
+              var subText = document.createElement("span");
+              subText.className = "loop-substep-text";
+              var subLabel = document.createElement("strong");
+              subLabel.textContent = m.label + ": ";
+              subText.appendChild(subLabel);
+              var subDetail = document.createElement("span");
+              fillDetail(subDetail, stepDetail[m.key]);
+              subText.appendChild(subDetail);
+              sub.appendChild(subIcon);
+              sub.appendChild(subText);
+              subgrid.appendChild(sub);
+            });
+            node.appendChild(subgrid);
+
+            stepperEl.appendChild(node);
+            isLastBox = j >= STEPS.length;
+            i = j;
+
+            if (!isLastBox) {
+              var connector = document.createElement("div");
+              var connState = gStatus === "done" ? "done" : gStatus === "skipped" ? "skipped" : "pending";
+              connector.className = "loop-connector loop-connector-" + connState;
+              stepperEl.appendChild(connector);
+            }
           } else {
-            detailEl.textContent = stepDetail[s.key];
-          }
+            ordinal++;
+            var node2 = document.createElement("div");
+            node2.className = "loop-step loop-step-" + stepStatus[s.key];
 
-          node.appendChild(iconEl);
-          node.appendChild(labelEl);
-          node.appendChild(detailEl);
-          stepperEl.appendChild(node);
+            var iconEl2 = document.createElement("div");
+            iconEl2.className = "loop-step-icon";
+            iconEl2.textContent = iconFor(stepStatus[s.key], ordinal);
 
-          if (i < STEPS.length - 1) {
-            var connector = document.createElement("div");
-            var connState = stepStatus[s.key] === "done" ? "done" :
-              stepStatus[s.key] === "skipped" ? "skipped" : "pending";
-            connector.className = "loop-connector loop-connector-" + connState;
-            stepperEl.appendChild(connector);
+            var labelEl2 = document.createElement("div");
+            labelEl2.className = "loop-step-label";
+            labelEl2.textContent = s.label;
+
+            var detailEl2 = document.createElement("div");
+            detailEl2.className = "loop-step-detail";
+            fillDetail(detailEl2, stepDetail[s.key]);
+
+            node2.appendChild(iconEl2);
+            node2.appendChild(labelEl2);
+            node2.appendChild(detailEl2);
+            stepperEl.appendChild(node2);
+
+            i++;
+            isLastBox = i >= STEPS.length;
+
+            if (!isLastBox) {
+              var connector2 = document.createElement("div");
+              var connState2 = stepStatus[s.key] === "done" ? "done" :
+                stepStatus[s.key] === "skipped" ? "skipped" : "pending";
+              connector2.className = "loop-connector loop-connector-" + connState2;
+              stepperEl.appendChild(connector2);
+            }
           }
-        });
+        }
       }
 
       function jobStatusFor(jobs, jobName) {
@@ -232,7 +324,7 @@
           if (!mode) {
             var baseChecks = await Promise.all([
               ghJson(API_BASE + "/commits/main"),
-              ghJson(API_BASE + "/pulls?state=all&sort=created&direction=desc&per_page=5"),
+              ghJson(API_BASE + "/pulls?state=all&sort=created&direction=desc&per_page=20"),
             ]);
             var commitRes = baseChecks[0], prsRes = baseChecks[1];
             if (!commitRes.ok) {
@@ -251,7 +343,7 @@
             clearError();
 
             var newPr = (prsRes.body || []).find(function (p) {
-              return new Date(p.created_at).getTime() > baselineTime;
+              return !baselinePrNumbers.has(p.number);
             });
             var directSha = commitRes.body.sha !== baselineSha ? commitRes.body.sha : null;
 
@@ -488,7 +580,11 @@
         matchedRun = null;
         backoffMs = currentPollMs();
 
-        var res = await ghJson(API_BASE + "/commits/main");
+        var startChecks = await Promise.all([
+          ghJson(API_BASE + "/commits/main"),
+          ghJson(API_BASE + "/pulls?state=all&sort=created&direction=desc&per_page=20"),
+        ]);
+        var res = startChecks[0], prsRes0 = startChecks[1];
         if (!res.ok) {
           showError(friendlyApiError(res.status, res.body.message));
           startBtn.disabled = false;
@@ -497,7 +593,10 @@
           return;
         }
         baselineSha = res.body.sha;
-        baselineTime = Date.now();
+        // Fails open (empty set) if this specific call errors — worst case a
+        // pre-existing PR gets misread as "new" on the very next poll, which
+        // self-corrects immediately since polling continues regardless.
+        baselinePrNumbers = new Set(prsRes0.ok ? (prsRes0.body || []).map(function (p) { return p.number; }) : []);
         baselineInfo.textContent = "Baseline captured at " + baselineSha.slice(0, 7) +
           ". Now ask Claude to implement something (it opens a PR and the gate has to pass before it merges) — or push directly to main — watching for either…";
 
@@ -506,6 +605,17 @@
       }
 
       startBtn.addEventListener("click", startWatching);
+
+      // Background tabs get their timers throttled or fully suspended by the
+      // browser, which can make this look "stuck" even though nothing here
+      // is actually broken — coming back to the tab just re-polls instantly
+      // instead of waiting for however delayed the next throttled tick is.
+      document.addEventListener("visibilitychange", function () {
+        if (!document.hidden && watching) {
+          clearTimeout(pollTimer);
+          poll();
+        }
+      });
 
       resetSteps();
       renderStepper();
