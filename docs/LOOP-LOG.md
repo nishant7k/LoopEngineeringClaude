@@ -153,6 +153,93 @@ IDs are copied from real `git`/`gh` output, not written in advance.
   live-demo action; `scripts/reset-demo.sh` reverts it back to `false`.
 - **Commit / Push / Build / Deploy / Monitor**: recorded live below.
 
+## Security review loop — AIDLC applied to the security gate itself
+
+Spec: [`specs/FEATURE-SPEC-security-loop.md`](../specs/FEATURE-SPEC-security-loop.md),
+adapting practices from
+[Figma's "How Figma stays ahead of vulnerabilities with agents"](https://www.figma.com/blog/how-figma-stays-ahead-of-vulnerabilities-with-agents/)
+to demo scale. Every PR below is real, on `nishant7k/LoopEngineeringClaude`,
+merged only after its own `security`/`Test` checks passed — the loop
+mechanism proving itself on its own change.
+
+### Iteration 0 — bootstrap, and a real gap it caught in itself
+
+- **Code**: `.github/workflows/security-review.yml` added — commit
+  `ed6364d` (direct push, before the PR-based loop below started).
+- **PR #1** (`6a49cc0`) wired `ci-cd.yml`'s `Test` job into PRs and armed
+  auto-merge + branch protection (`security` + `Test` required).
+- **Real gap found live, not simulated**: PR #1's first `security` run
+  ([34271430538](https://github.com/nishant7k/LoopEngineeringClaude/actions/runs/34271430538),
+  `failure`, 0s) failed correctly — `CLAUDE_API_KEY` wasn't set yet. The
+  retry
+  ([34271699196](https://github.com/nishant7k/LoopEngineeringClaude/actions/runs/34271699196),
+  `success`, **16s**) reported `pass` — but its own log reads *"ClaudeCode
+  has already run on PR #1 (found marker file), forcing disable to avoid
+  false positives"*: the action's caching treated the failed attempt as
+  "already ran" and silently skipped scanning. PR #1 merged with a green
+  check that never actually scanned anything.
+- **PR #2** (`ebe67ff`) proved the fix once `CLAUDE_API_KEY` was added: a
+  fresh diff forces a new cache key, so its run
+  ([34272199324](https://github.com/nishant7k/LoopEngineeringClaude/actions/runs/34272199324),
+  `success`, 57s) shows *"ClaudeCode will run for PR #2 (first run)"* and
+  a real `"findings": []` result. This gap — a fake pass indistinguishable
+  from a real one without reading raw logs — is exactly what iteration 3
+  below (loop metrics) makes visible at a glance instead.
+
+### Iteration 1 — policy as threat model
+
+- PR #3 (`8ad9832`): `SECURITY-POLICY.md` (6 precedents) + wired into
+  `security-review.yml` via `custom-security-scan-instructions` /
+  `false-positive-filtering-instructions`.
+- `security` run [34274986063](https://github.com/nishant7k/LoopEngineeringClaude/actions/runs/34274986063) —
+  `success`, **1m16s** (a real scan referencing the new policy, not a
+  cache-skip).
+
+### Iteration 2 — recall eval fixtures
+
+- PR #4 (`89dfe8a`): `security/eval-fixtures/` (command injection,
+  reflected XSS, hardcoded secret) + runbook. First push attempt was
+  blocked by **GitHub push protection** for a Stripe-shaped fake key in
+  `hardcoded-secret.js` — real, unplanned validation that the fixture
+  looked realistic; fixed to a non-vendor-pattern placeholder before the
+  successful push.
+- `security` run [34275256803](https://github.com/nishant7k/LoopEngineeringClaude/actions/runs/34275256803) —
+  `success`, **2m52s** (longest scan yet — 3 fixtures to analyze).
+
+### Iteration 3 — loop metrics (observe)
+
+- PR #5 (`7bd3181`): `monitoring.html` gained a "Security review loop"
+  stat row (scans shown / pass / fail / latest), filtered from the same
+  already-fetched `/actions/runs` data — no new endpoint.
+- `security` run [34275682458](https://github.com/nishant7k/LoopEngineeringClaude/actions/runs/34275682458) —
+  `success`, 53s.
+
+### Iteration 4 — false-positive feedback loop (repeat)
+
+- PR #6 (`4fe9430`): `.github/workflows/security-policy-update.yml` — a
+  `/security-fp <reason>` PR comment appends a precedent to
+  `SECURITY-POLICY.md` and opens a new PR against `main`.
+- `security` run [34276006065](https://github.com/nishant7k/LoopEngineeringClaude/actions/runs/34276006065) —
+  `success`, **1m31s**.
+- **Not yet exercised live**: no `/security-fp` comment has been posted
+  against a real finding yet — this row updates the moment one is.
+
+### Security-review run history (real durations, not illustrative)
+
+| Run | PR | Conclusion | Duration | Note |
+|-----|----|----|----------|------|
+| [34271430538](https://github.com/nishant7k/LoopEngineeringClaude/actions/runs/34271430538) | #1 | failure | 0s | missing `CLAUDE_API_KEY` |
+| [34271699196](https://github.com/nishant7k/LoopEngineeringClaude/actions/runs/34271699196) | #1 | success | 16s | **fake pass** — cache-skipped, no scan ran |
+| [34272199324](https://github.com/nishant7k/LoopEngineeringClaude/actions/runs/34272199324) | #2 | success | 57s | real scan, 0 findings |
+| [34274986063](https://github.com/nishant7k/LoopEngineeringClaude/actions/runs/34274986063) | #3 | success | 1m16s | real scan, policy wired in |
+| [34275256803](https://github.com/nishant7k/LoopEngineeringClaude/actions/runs/34275256803) | #4 | success | 2m52s | real scan, 3 fixtures analyzed |
+| [34275682458](https://github.com/nishant7k/LoopEngineeringClaude/actions/runs/34275682458) | #5 | success | 53s | real scan |
+| [34276006065](https://github.com/nishant7k/LoopEngineeringClaude/actions/runs/34276006065) | #6 | success | 1m31s | real scan |
+
+The 16s-vs-53s+ gap is the whole lesson: a real Claude Code security scan
+on this repo consistently takes closer to a minute, not seconds. That's
+now the manual tell documented in `monitoring.html` itself.
+
 ---
 
 **Note on authenticity**: rows marked _pending_ are stages that require
