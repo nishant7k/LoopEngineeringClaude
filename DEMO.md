@@ -4,6 +4,24 @@
 > **this repository**, running live — not a mock. See `docs/LOOP-LOG.md` for
 > the real commit/run history behind every claim here.
 
+## Running order — two loops, one session
+
+This repo now has two independent loops to show, back to back, as one
+narrative arc (same reframe, same six parts, applied twice):
+
+1. **Loop 1 — the feature loop** ("The loop, live" below): ask the loop to
+   implement something, watch it go through the gate, watch it deploy.
+2. **Loop 2 — the security loop** ("Second story: the security review
+   loop" further down): the *same* loop shape, pointed at the CI pipeline
+   itself instead of the app — with a real bug the loop caught in its own
+   gate along the way, which is the strongest beat in either story.
+
+Suggested order: run Loop 1 first (it's the more visual, more legible
+"watch it build" moment), then pivot with *"now watch the same loop
+pattern applied somewhere less obvious — hardening its own checks"* into
+Loop 2. `docs/LOOP-LOG.md` is the single artifact that ties both
+together at the end — real evidence for both stories in one file.
+
 ## The reframe, in one line
 
 > "My job is to write loops." — Boris Cherny
@@ -97,3 +115,65 @@ Per the deck: *if it stalls, cut to the recording immediately — don't
 debug on stage.* `monitoring.html` shows the real Actions history
 regardless of whether a live trigger is running; `before-after.html` is
 accurate as static snapshots without needing a live toggle at all.
+
+---
+
+## Second story: the security review loop
+
+> Adapted from Figma's ["How Figma stays ahead of vulnerabilities with
+> agents"](https://www.figma.com/blog/how-figma-stays-ahead-of-vulnerabilities-with-agents/) —
+> full rationale in `specs/FEATURE-SPEC-security-loop.md`. Same loop
+> shape as above, pointed at the CI pipeline instead of the app.
+
+### The six parts, this time for security
+
+| Part (from the talk) | What it does | In this repo |
+|---|---|---|
+| Something that starts it | Wakes the loop up | Any PR against `main` |
+| Written-down rules | Institutional reasoning, not re-litigated every scan | [`SECURITY-POLICY.md`](../SECURITY-POLICY.md) — precedents, not generic rules |
+| Access to real tools | Reaches where the work actually lives | `anthropics/claude-code-security-review`, reading the real diff |
+| A second, independent checker | Doesn't trust the writer's own judgment | The `security` job in `.github/workflows/security-review.yml` |
+| The gate | Decides what's safe to ship | Branch protection on `main` — `security` + `Test` both required |
+| A file that remembers | Survives past the end of one conversation | `docs/LOOP-LOG.md`'s security-loop section + run-history table |
+
+The loop-back this time isn't a human editing the policy from memory —
+it's `.github/workflows/security-policy-update.yml`: a `/security-fp
+<reason>` PR comment appends a new precedent and opens a PR against
+`main` with that change. The policy improves from real disputes, not
+from someone remembering to update a doc.
+
+### What to narrate live
+
+1. **The condition** — open a PR (even a trivial one) and say out loud:
+   *"every PR here gets a real AI security review before it can merge."*
+2. **The checker disagreeing with the writer — a true story, already on
+   the record.** This isn't hypothetical: PR #1 in this repo's own
+   history merged with a `security` check that reported `pass` in
+   **16 seconds** — but its own log reads *"ClaudeCode has already run on
+   PR #1 (found marker file), forcing disable to avoid false
+   positives."* A failed first attempt (missing API key) got cached as
+   "already ran," and the retry silently skipped scanning. Open
+   [run 34271699196](https://github.com/nishant7k/LoopEngineeringClaude/actions/runs/34271699196)
+   live and read that line out loud — then show
+   [run 34272199324](https://github.com/nishant7k/LoopEngineeringClaude/actions/runs/34272199324),
+   the real scan once the key was fixed, at 57s. **A real scan on this
+   repo takes 50s to 3 minutes, never ~15 seconds** — that gap is now
+   documented as the manual tell in both `monitoring.html` and
+   `docs/LOOP-LOG.md`. This is the single best "never let it mark its
+   own homework" moment in either loop, because it's not staged — it's
+   what actually happened while building this.
+3. **The state file afterwards** — `docs/LOOP-LOG.md`'s "Security review
+   loop" section: real PR numbers, real commit SHAs, real run IDs and
+   durations for every iteration, plus the run-history table showing the
+   16s-fake-pass vs. 53s+-real-scan contrast side by side.
+
+If time allows, a fourth beat: comment `/security-fp <reason>` on any
+open PR and watch `security-policy-update.yml` open a new PR against
+`SECURITY-POLICY.md` live — the loop editing its own rules.
+
+### Fallback
+
+Same rule as Loop 1: don't debug a stalled Action live.
+`monitoring.html`'s "Security review loop" panel (real pass/fail counts
+against the real GitHub API) and `docs/LOOP-LOG.md`'s run-history table
+both work as static evidence without triggering anything new.
