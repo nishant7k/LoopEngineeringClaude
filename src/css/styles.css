@@ -690,6 +690,45 @@ body {
 .loop-connector-done { background: var(--green); }
 .loop-connector-skipped { background: var(--gray); opacity: 0.5; }
 
+.loop-step-group {
+  flex: 1 0 260px;
+  min-width: 260px;
+  text-align: left;
+}
+.loop-step-group .loop-step-label {
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.loop-substep-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.loop-substep {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.loop-substep-icon {
+  flex: 0 0 16px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.loop-substep-text a { color: var(--accent); }
+
+.loop-substep-done .loop-substep-icon { color: var(--green); }
+.loop-substep-active .loop-substep-icon { color: var(--amber); }
+.loop-substep-failed .loop-substep-icon { color: var(--red); }
+.loop-substep-skipped .loop-substep-icon { color: var(--gray); }
+.loop-substep-pending .loop-substep-icon { color: var(--gray); }
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
