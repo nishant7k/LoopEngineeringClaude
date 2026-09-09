@@ -671,6 +671,16 @@ body {
   background: rgba(242, 85, 90, 0.12);
 }
 
+.loop-step-skipped {
+  border-color: var(--panel-border);
+  background: #14161d;
+  opacity: 0.6;
+}
+.loop-step-skipped .loop-step-icon {
+  border-color: var(--gray);
+  color: var(--text-dim);
+}
+
 .loop-connector {
   flex: 0 0 24px;
   align-self: center;
@@ -678,6 +688,7 @@ body {
   background: var(--panel-border);
 }
 .loop-connector-done { background: var(--green); }
+.loop-connector-skipped { background: var(--gray); opacity: 0.5; }
 
 @keyframes spin {
   to { transform: rotate(360deg); }

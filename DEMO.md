@@ -4,23 +4,38 @@
 > **this repository**, running live — not a mock. See `docs/LOOP-LOG.md` for
 > the real commit/run history behind every claim here.
 
-## Running order — two loops, one session
+## Running order — one merged loop, then a second story about its gate
 
-This repo now has two independent loops to show, back to back, as one
-narrative arc (same reframe, same six parts, applied twice):
+The feature loop and the security loop used to be tellable as two
+separate demos. They no longer are: `feature-flags.json` (and any other
+change) now ships through a real PR, and `loop-live.html` watches that
+whole path in one stepper — Code → PR → **Lint / Test / Security**
+(the actual required checks, polled from the PR's own check-runs) →
+**Gate** (auto-merge, only once all three are green) → Build → Deploy →
+Monitor. Ask for a feature once, and the security gate is already part
+of the same picture the audience is watching — nothing extra to trigger.
 
-1. **Loop 1 — the feature loop** ("The loop, live" below): ask the loop to
-   implement something, watch it go through the gate, watch it deploy.
-2. **Loop 2 — the security loop** ("Second story: the security review
-   loop" further down): the *same* loop shape, pointed at the CI pipeline
-   itself instead of the app — with a real bug the loop caught in its own
-   gate along the way, which is the strongest beat in either story.
+1. **Loop 1 — the feature loop** ("The loop, live" below): ask the loop
+   to implement something. It opens a PR, the audience watches Lint,
+   Test, and **Security** run as real PR checks, then watches the gate
+   auto-merge and deploy — one continuous stepper, no separate story
+   needed to prove security ran.
+2. **Loop 2 — the false-positive story** ("Second story: the security
+   review loop" further down): once the audience has *seen* the gate
+   run for real, pivot to the one time it got the answer to that gate
+   wrong — the real PR #1 caching bug — as the "never let it mark its
+   own homework" beat. This is now a callback to something they just
+   watched happen correctly, not the first time security comes up.
 
-Suggested order: run Loop 1 first (it's the more visual, more legible
-"watch it build" moment), then pivot with *"now watch the same loop
-pattern applied somewhere less obvious — hardening its own checks"* into
-Loop 2. `docs/LOOP-LOG.md` is the single artifact that ties both
-together at the end — real evidence for both stories in one file.
+`docs/LOOP-LOG.md` is the single artifact that ties both together at
+the end — real evidence for both stories in one file.
+
+> Note: a change pushed directly to `main` (e.g. `scripts/reset-demo.sh`)
+> has no PR and so never touches the security gate —
+> `security-review.yml` only triggers on `pull_request`. `loop-live.html`
+> detects this and marks PR/Security/Gate as **skipped** rather than
+> pretending they ran; the reset is a repeatable admin action, not a
+> gated change, so this is accurate, not a bug.
 
 ## The reframe, in one line
 
@@ -38,8 +53,8 @@ repo, that you can watch end to end.
 | Something that starts it | Wakes the loop up | You, asking Claude directly — or `push` / `workflow_dispatch` |
 | Written-down rules | Conventions saved once, not re-explained every run | `specs/AIDLC-SPEC.md`, `specs/FEATURE-SPEC-realtime-feed.md` |
 | Access to real tools | Reaches where the work actually lives | GitHub REST API, GitHub Actions, Celestrak, wheretheiss.at |
-| A second, independent checker | Doesn't trust the writer's own judgment | **GitHub Actions** — `Lint & Design Standards` + `Test` jobs |
-| The gate | Decides what's safe to ship | `needs: [lint, test]` — Build/Deploy literally cannot run if the checker disagrees |
+| A second, independent checker | Doesn't trust the writer's own judgment | **GitHub Actions** — `Lint & Design Standards` + `Test` + `security` (an AI review, but *of the diff*, never of its own output) |
+| The gate | Decides what's safe to ship | Branch protection on `main` — `security` + `Test` required, auto-merge only fires once both are green |
 | A file that remembers | Survives past the end of one conversation | `docs/LOOP-LOG.md` — real SHAs and run IDs, not a summary written after the fact |
 
 Notice the checker here isn't a second LLM — it's deterministic tests and a
@@ -61,20 +76,22 @@ run, not a mock DOM) are that check.
   'fontFamily': 'IBM Plex Sans, sans-serif'
 }}}%%
 flowchart LR
-    ASK["Ask the loop\n(you → Claude)"]:::human --> CODE["Code\nedit spec-gated feature"]:::write
-    CODE --> COMMIT["Commit\nreal git commit"]:::write
-    COMMIT --> PUSH["Push\norigin main"]:::write
-    PUSH --> LINT{"Lint & Design\nStandards"}:::check
-    PUSH --> TEST{"Test\nreal headless browser"}:::check
-    LINT -->|pass| GATE{{"Gate\nneeds: lint, test"}}:::gate
+    ASK["Ask the loop\n(you → Claude)"]:::human --> CODE["Code · Commit\nreal git commit, a branch"]:::write
+    CODE --> PR["Push → Pull Request\nagainst main"]:::write
+    PR --> LINT{"Lint & Design\nStandards"}:::check
+    PR --> TEST{"Test\nreal headless browser"}:::check
+    PR --> SEC{"Security\nreal AI review of the diff"}:::check
+    LINT -->|pass| GATE{{"Gate\nbranch protection: security + Test"}}:::gate
     TEST -->|pass| GATE
-    LINT -.->|fail| STOP["Nothing ships\nfix required"]:::stop
+    SEC -->|pass| GATE
+    LINT -.->|fail| STOP["Nothing merges\nfix required"]:::stop
     TEST -.->|fail| STOP
-    GATE --> BUILD["Build\ndist/ + build-metadata.json"]:::write
+    SEC -.->|fail| STOP
+    GATE -->|auto-merge| BUILD["Build\ndist/ + build-metadata.json"]:::write
     BUILD --> DEPLOY["Deploy\ngh-pages"]:::write
     DEPLOY --> MONITOR["Monitor\nlive site confirms SHA"]:::state
     MONITOR --> LOG[("docs/LOOP-LOG.md\nthe file that remembers")]:::state
-    LOG -.->|reset-demo.sh| ASK
+    LOG -.->|reset-demo.sh, direct push| ASK
 
     classDef human fill:#3b2e1b,stroke:#d9a45b,color:#edf2f4
     classDef write fill:#1a242b,stroke:#5cbbcb,color:#edf2f4
@@ -87,11 +104,11 @@ flowchart LR
 Every box above is a real thing you can click on right now:
 
 - **Ask** → you, live, in the terminal
-- **Code / Commit / Push** → `git log` on `main`
-- **Lint / Test** → [Actions tab](https://github.com/nishant7k/LoopEngineeringClaude/actions), real jobs, real durations
-- **Gate** → the `needs:` line in [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml) — not a metaphor, the actual YAML
+- **Code / Push → PR** → `git log` on the feature branch, and the PR itself on GitHub
+- **Lint / Test / Security** → [Actions tab](https://github.com/nishant7k/LoopEngineeringClaude/actions), real jobs, real durations, all three run *as PR checks* before anything merges
+- **Gate** → [branch protection on `main`](https://github.com/nishant7k/LoopEngineeringClaude/settings/branches) requiring `security` + `Test` — not a metaphor, the actual required-checks list
 - **Build / Deploy** → [gh-pages branch](https://github.com/nishant7k/LoopEngineeringClaude/tree/gh-pages)
-- **Monitor** → [`loop-live.html`](https://nishant7k.github.io/LoopEngineeringClaude/loop-live.html), watching the same API you'd hit with `gh run list`
+- **Monitor** → [`loop-live.html`](https://nishant7k.github.io/LoopEngineeringClaude/loop-live.html), which now watches this entire path — PR, checks, merge, deploy — in one stepper, polling the same API you'd hit with `gh run list` / `gh pr checks`
 - **The loop-back** → `scripts/reset-demo.sh`, a real `git` revert-and-push, not a UI reset
 
 ## What to narrate live (three things, per the talk's own advice)
