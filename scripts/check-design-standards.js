@@ -13,12 +13,12 @@ const REQUIRED_TOKENS = [
 const failures = [];
 
 function checkCssTokens() {
-  const css = fs.readFileSync("css/styles.css", "utf8");
+  const css = fs.readFileSync("src/css/styles.css", "utf8");
   const rootBlockMatch = css.match(/:root\s*{([^}]*)}/);
   const rootBlock = rootBlockMatch ? rootBlockMatch[1] : "";
   for (const token of REQUIRED_TOKENS) {
     if (!rootBlock.includes(`${token}:`)) {
-      failures.push(`Missing required design token '${token}' in :root of css/styles.css`);
+      failures.push(`Missing required design token '${token}' in :root of src/css/styles.css`);
     }
   }
 }
@@ -43,7 +43,7 @@ function checkLiveRegions(file) {
 }
 
 checkCssTokens();
-for (const file of ["index.html"]) {
+for (const file of ["src/index.html"]) {
   checkButtonsHaveLabels(file);
   checkLiveRegions(file);
 }

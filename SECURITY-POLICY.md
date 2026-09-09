@@ -36,8 +36,8 @@ of re-litigating it.
 
 - **`el.innerHTML = ""` is not an XSS sink.** Assigning the empty string
   clears a node; it can't inject anything regardless of what any other
-  variable in scope contains. This pattern appears in `js/app.js`,
-  `js/globe.js`, `loop-live.html`, and `monitoring.html` purely to reset
+  variable in scope contains. This pattern appears in `src/js/app.js`,
+  `src/js/globe.js`, `src/loop-live.html`, and `src/monitoring.html` purely to reset
   DOM content between renders. Only flag `innerHTML` assignments that
   interpolate untrusted or remote data into the string.
 
@@ -53,7 +53,7 @@ of re-litigating it.
   keychain-backed). Missing explicit token handling in these scripts is
   the intended design, not an omission.
 
-- **The public API calls in `js/app.js` are not SSRF risk.** All of
+- **The public API calls in `src/js/app.js` are not SSRF risk.** All of
   `api.wheretheiss.at`, `api.bigdatacloud.net`, and
   `hacker-news.firebaseio.com` are unauthenticated, keyless, CORS-enabled,
   read-only endpoints, and every URL is a hardcoded constant — none are

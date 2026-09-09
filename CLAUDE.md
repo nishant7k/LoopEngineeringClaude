@@ -19,18 +19,18 @@ does.
 
 ```bash
 # Run locally — static site, no build step
-open index.html
-python3 -m http.server        # or serve over HTTP (needed for feature-flags.json fetch)
+open src/index.html
+cd src && python3 -m http.server   # or serve over HTTP (needed for feature-flags.json fetch)
 
 # Lint (design tokens + accessibility baseline, zero deps, ~200ms)
 npm run test:design           # node scripts/check-design-standards.js
 
 # Real headless-Chromium e2e test (Playwright) — self-serves over HTTP internally
-npm run test:e2e              # node tests/e2e.js index.html
+npm run test:e2e              # node tests/e2e.js src/index.html
 npx playwright install --with-deps chromium   # one-time, if not already installed
 
 # Structural syntax check (used in CI before the e2e test)
-node --check js/app.js
+node --check src/js/app.js
 
 # One-time GitHub setup: verify gh auth/scopes, ensure repo + origin remote exist
 scripts/setup-github.sh
@@ -45,11 +45,14 @@ scripts/monitor-ci.sh
 scripts/reset-demo.sh
 ```
 
-There is no bundler, no package build, no `npm run build` — `index.html`,
-`css/styles.css`, `js/app.js`, `js/globe.js` are the actual shipped app.
-`dist/` only exists as a CI artifact, assembled by explicitly copying that
-same file list (see the `Assemble dist` step in `ci-cd.yml`) — it is not
-a bundler output and has no separate source of truth.
+There is no bundler, no package build, no `npm run build` — everything
+under `src/` (`index.html`, `css/styles.css`, `js/app.js`, `js/globe.js`,
+`monitoring.html`, `loop-live.html`, `before-after.html`,
+`feature-flags.json`) is the actual shipped app. `dist/` only exists as a
+CI artifact, assembled by explicitly copying that same file list flat
+into `dist/` (see the `Assemble dist` step in `ci-cd.yml` — this is why
+`src/` doesn't appear in any live URL) — it is not a bundler output and
+has no separate source of truth.
 
 ## Architecture
 
@@ -125,7 +128,7 @@ additionally plots Hubble/Tiangong/Starlink via cached TLEs
 tag, then one real pushed "Reset:" commit — never a force-push or hard
 reset) make the ask-implement-watch-reset cycle repeatable across
 rehearsals. Check what `demo-baseline` currently points to
-(`git show demo-baseline:feature-flags.json`) before relying on
+(`git show demo-baseline:src/feature-flags.json`) before relying on
 `reset-demo.sh` for a specific demo — the tag records whatever state it
 was last moved to, which may not match a given spec iteration's intended
 "before" state.

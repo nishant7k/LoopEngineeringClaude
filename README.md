@@ -27,8 +27,8 @@ the security gate — that's a deliberate, visible difference, not a bug.
 
 ## What this demonstrates
 
-- A small real-time feed app (`index.html`, `css/styles.css`, `js/app.js`)
-  as the subject of the loop.
+- A small real-time feed app (`src/index.html`, `src/css/styles.css`,
+  `src/js/app.js`) as the subject of the loop.
 - A spec-driven process: [`specs/AIDLC-SPEC.md`](specs/AIDLC-SPEC.md)
   defines the loop methodology; [`specs/FEATURE-SPEC-realtime-feed.md`](specs/FEATURE-SPEC-realtime-feed.md)
   defines the feature under iteration.
@@ -47,9 +47,9 @@ the security gate — that's a deliberate, visible difference, not a bug.
 No build step required — it's static HTML/CSS/JS.
 
 ```bash
-open index.html
-# or, to serve it over HTTP:
-python3 -m http.server
+open src/index.html
+# or, to serve it over HTTP (needed for the feature-flags.json fetch):
+cd src && python3 -m http.server
 ```
 
 ## CI/CD pipeline
@@ -155,11 +155,11 @@ scripts/run-loop.sh "Custom commit message"
 
 ```bash
 scripts/monitor-ci.sh          # terminal: recent runs + Pages status
-open monitoring.html           # live dashboard in the browser (GitHub Actions REST API)
+open src/monitoring.html       # live dashboard in the browser (GitHub Actions REST API)
 ```
 
 ## Before / after
 
-[`before-after.html`](before-after.html) shows a side-by-side comparison of
+[`before-after.html`](src/before-after.html) shows a side-by-side comparison of
 the app before and after a loop iteration, to make the effect of the loop
 visible at a glance.

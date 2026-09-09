@@ -1,11 +1,11 @@
 # Security-scanner recall fixtures
 
 These files are **intentionally vulnerable test fixtures**. None of them
-are imported by the real app (`index.html`, `js/app.js`, etc.), none are
+are imported by the real app (`src/index.html`, `src/js/app.js`, etc.), none are
 copied into `dist/` by `ci-cd.yml`'s build step (which lists the real
 app files explicitly — see the `Assemble dist` step), and none affect
 `scripts/check-design-standards.js` or `tests/e2e.js` (both target
-`index.html` only). They exist for one purpose: proving the security
+`src/index.html` only). They exist for one purpose: proving the security
 scanner still catches known bug classes after `SECURITY-POLICY.md` gets
 edited.
 
