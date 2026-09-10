@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loop Engineering — the leverage point moved</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EDEFF1;
+  --panel:#E3E7EA;
+  --panel-2:#D9DEE2;
+  --ink:#10171C;
+  --ink-2:#3D4A53;
+  --ink-3:#6B777F;
+  --rule:#C6CFD5;
+  --machine:#0E6E7C;
+  --machine-soft:#CFE4E7;
+  --human:#9A5B12;
+  --human-soft:#EDE0CC;
+  --rule-soft:#D5DCE0;
+  --stage-w:1280px;
+  --stage-h:720px;
+
+  /* the three inverted moments: title, demo, closing */
+  --flip-bg:#10171C; --flip-fg:#F2F5F6; --flip-mute:#AEBBC2;
+  --flip-dim:#7E8F98; --flip-accent:#7FB6BE; --flip-rule:#2C363C; --flip-warm:#D9A45B;
+}
+
+body.theme-dark{
+  --paper:#0F1519;
+  --panel:#1A242B;
+  --panel-2:#243139;
+  --ink:#EDF2F4;
+  --ink-2:#B3C1C9;
+  --ink-3:#7F909A;
+  --rule:#2A363E;
+  --rule-soft:#222D34;
+  --machine:#5CBBCB;
+  --machine-soft:#123C45;
+  --human:#D9A45B;
+  --human-soft:#3B2E1B;
+  /* flip-* intentionally NOT overridden here: title, demo, and closing
+     stay on the dark palette in both appearances, by design. */
+}
+
+.slide.flip{background:var(--flip-bg)}
+.slide.flip h1,.slide.flip .line,.slide.flip h2,.slide.flip h3{color:var(--flip-fg)}
+.slide.flip .sub,.slide.flip .after,.slide.flip .note,.slide.flip p,.slide.flip p.small{color:var(--flip-mute)}
+.slide.flip .meta{color:var(--flip-dim)}
+.slide.flip .kicker,.slide.flip .flipaccent{color:var(--flip-accent)}
+.slide.flip .foot{border-top-color:var(--flip-rule);color:var(--flip-dim)}
+.slide.flip .foot .tag{color:var(--flip-accent)}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:#20262A;
+  color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,sans-serif;
+  overflow:hidden;
+  display:flex;flex-direction:column;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ---------- stage ---------- */
+#viewport{flex:1;position:relative;overflow:hidden}
+#stage{
+  position:absolute;top:0;left:0;
+  width:var(--stage-w);height:var(--stage-h);
+  background:var(--paper);
+  transform-origin:top left;
+  overflow:hidden;
+}
+.slide{
+  position:absolute;inset:0;
+  padding:64px 78px 60px 132px;
+  display:none;
+  flex-direction:column;
+}
+.slide.on{display:flex;animation:in .22s ease-out both}
+@keyframes in{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.slide.on{animation:none}}
+
+/* ---------- left rail: the revolution counter ---------- */
+#rail{
+  position:absolute;left:0;top:0;bottom:0;width:96px;
+  border-right:1px solid var(--rule);
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:flex-start;padding:52px 0 44px;
+  z-index:5;pointer-events:none;
+}
+#rail .mark{width:44px;height:44px}
+#rail .mark circle{fill:none;stroke-width:3}
+#rail .mark .track{stroke:var(--rule)}
+#rail .mark .fill{stroke:var(--machine);stroke-linecap:butt;transition:stroke-dasharray .3s ease}
+#rail .actname{
+  writing-mode:vertical-rl;transform:rotate(180deg);
+  font-size:12px;letter-spacing:.16em;color:var(--ink-3);
+  font-weight:500;margin:auto 0;
+}
+@keyframes orbit{to{offset-distance:100%}}
+.title-orbit .runner1{offset-path:path("M 260 32 A 228 228 0 1 1 259.9 32");animation:orbit 15s linear infinite}
+.title-orbit .runner2{offset-path:path("M 260 84 A 176 176 0 1 1 259.9 84");animation:orbit 10.5s linear infinite reverse}
+.title-orbit .runner3{offset-path:path("M 260 142 A 118 118 0 1 1 259.9 142");animation:orbit 6.5s linear infinite}
+@media (prefers-reduced-motion:reduce){.title-orbit .runner1,.title-orbit .runner2,.title-orbit .runner3{animation:none}}
+
+#rail.dark{border-right-color:var(--flip-rule)}
+#rail.dark .mark .track{stroke:var(--flip-rule)}
+#rail.dark .mark .fill{stroke:var(--flip-accent)}
+#rail.dark .actname{color:var(--flip-dim)}
+#rail.dark .num{color:#8598A1}
+#rail.dark .num b{color:#E4EBEF}
+
+/* ---------- typography ---------- */
+.kicker{
+  font-size:14px;font-weight:500;color:var(--machine);
+  letter-spacing:.005em;margin-bottom:18px;
+}
+h1{
+  font-family:Archivo,sans-serif;font-variation-settings:"wdth" 112,"wght" 620;
+  font-size:80px;line-height:.96;letter-spacing:-.022em;
+}
+h2{
+  font-family:Archivo,sans-serif;font-variation-settings:"wdth" 108,"wght" 600;
+  font-size:40px;line-height:1.08;letter-spacing:-.016em;max-width:22ch;
+}
+h2.wide{max-width:29ch}
+h3{
+  font-family:Archivo,sans-serif;font-variation-settings:"wdth" 104,"wght" 600;
+  font-size:21px;line-height:1.18;letter-spacing:-.008em;
+}
+p{font-size:20px;line-height:1.52;color:var(--ink-2);max-width:60ch}
+p.lead{font-size:24px;line-height:1.44;color:var(--ink);max-width:44ch}
+p.small{font-size:16.5px;line-height:1.5;color:var(--ink-3);max-width:66ch}
+b,strong{font-weight:600;color:var(--ink)}
+code,.mono{font-family:"IBM Plex Mono",monospace;font-size:15px}
+.cmd{
+  display:inline-block;background:var(--panel-2);color:var(--ink);
+  padding:4px 9px;border-radius:2px;font-family:"IBM Plex Mono",monospace;
+  font-size:14.5px;letter-spacing:-.01em;
+}
+.teal{color:var(--machine)}
+.ochre{color:var(--human)}
+
+/* ---------- shared layout helpers ---------- */
+.body{flex:1;display:flex;flex-direction:column;justify-content:center}
+.foot{
+  margin-top:auto;padding-top:20px;border-top:1px solid var(--rule);
+  font-size:14.5px;color:var(--ink-3);display:flex;gap:12px;align-items:baseline;
+}
+.foot .tag{color:var(--machine);font-weight:500}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:start}
+.split.wideleft{grid-template-columns:1.15fr .85fr}
+.stack{display:flex;flex-direction:column;gap:16px}
+
+/* ---------- panels (flat, no shadows) ---------- */
+.panel{background:var(--panel);padding:22px 24px;border-radius:2px}
+.panel.line{background:transparent;border:1px solid var(--rule)}
+.panel.accent{background:var(--machine-soft)}
+.panel.warn{background:var(--human-soft)}
+.panel h3{margin-bottom:8px}
+.panel p{font-size:16.5px;line-height:1.45;color:var(--ink-2);max-width:none}
+
+/* ---------- title slide ---------- */
+.title-slide{padding-left:132px;justify-content:center}
+.title-slide h1{font-size:112px;max-width:11ch}
+.title-slide .sub{
+  font-size:25px;color:var(--ink-2);margin-top:26px;max-width:36ch;line-height:1.35;
+}
+.title-slide .meta{
+  margin-top:60px;display:flex;gap:30px;font-size:15.5px;color:var(--ink-3);letter-spacing:.01em;
+}
+.title-orbit{position:absolute;right:-120px;top:50%;transform:translateY(-50%);opacity:.9}
+
+/* ---------- statement slide ---------- */
+.statement{justify-content:center}
+.statement .line{
+  font-family:Archivo,sans-serif;font-variation-settings:"wdth" 108,"wght" 600;
+  font-size:47px;line-height:1.08;letter-spacing:-.02em;max-width:19ch;
+}
+.statement .after{margin-top:34px;font-size:23px;color:var(--ink-2);max-width:46ch;line-height:1.42}
+
+/* ---------- divider ---------- */
+.divider{justify-content:center;background:var(--ink);color:var(--paper)}
+.divider .act{font-family:"IBM Plex Mono",monospace;font-size:15px;color:#7FB6BE;letter-spacing:.08em}
+.divider h2{color:var(--paper);font-size:62px;max-width:17ch;margin-top:18px}
+.divider p{color:#9AA7AF;margin-top:22px;font-size:19px;max-width:50ch}
+.divider .arc{position:absolute;right:60px;bottom:48px;opacity:.5}
+
+/* ---------- quote ---------- */
+.quotes{display:flex;flex-direction:column;gap:48px;justify-content:center;flex:1}
+.qline{
+  font-family:Archivo,sans-serif;font-variation-settings:"wdth" 106,"wght" 500;
+  font-size:41px;line-height:1.14;letter-spacing:-.016em;max-width:24ch;
+}
+.qr-slide .line{max-width:15ch}
+.qr-slide .after{max-width:38ch}
+.qr-slide .qr{
+  position:absolute;right:92px;top:150px;width:196px;height:196px;
+  background:#fff;padding:10px;border-radius:6px;
+}
+.qr-slide .qrcap{
+  position:absolute;right:92px;top:360px;width:196px;text-align:center;
+  font-size:14px;color:var(--flip-dim);letter-spacing:.01em;
+}
+.qwho{margin-top:14px;font-size:15.5px;color:var(--ink-3);letter-spacing:.005em}
+.qwho b{color:var(--ink);font-weight:600}
+
+/* ---------- timeline (lineage) ---------- */
+/* origin timeline — five chronological nodes, one of them the Ralph hack */
+.otimeline{position:relative;margin-top:8px;padding-left:2px}
+.otimeline::before{
+  content:"";position:absolute;left:23px;top:6px;bottom:6px;width:2px;background:var(--rule);
+}
+.onode{display:flex;gap:22px;align-items:flex-start;position:relative;padding:9px 0}
+.onode .dot{
+  width:46px;height:46px;border-radius:50%;flex:none;position:relative;z-index:1;
+  background:var(--paper);border:1.5px solid var(--rule);
+  display:flex;align-items:center;justify-content:center;
+  font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--ink-3);
+}
+.onode .txt{flex:1;padding-top:2px}
+.onode .row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.onode .ttl{font-family:Archivo,sans-serif;font-variation-settings:"wdth" 104,"wght" 600;font-size:18px;color:var(--ink)}
+.onode .dt{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-3)}
+.onode .desc{margin-top:3px;font-size:14.5px;line-height:1.4;color:var(--ink-2);max-width:62ch}
+.onode.pivot .dot{border-color:var(--human);color:var(--human)}
+.onode.pivot .ttl{color:var(--human)}
+.onode.now .dot{background:var(--machine);border-color:var(--machine);color:#fff}
+.onode.now .ttl{color:var(--machine)}
+
+/* ---------- grid of four ---------- */
+.four{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:8px}
+.four .cell{background:var(--panel);padding:20px 22px;border-radius:2px;display:flex;flex-direction:column;gap:9px}
+.four .cell .hand{font-size:14.5px;color:var(--machine);font-weight:500}
+.four .cell p{font-size:16px;line-height:1.42;color:var(--ink-2);max-width:none}
+.four .cell .when{margin-top:auto;padding-top:10px;font-size:15px;color:var(--ink-3)}
+
+/* ---------- primitive rows ---------- */
+.prims{display:flex;flex-direction:column;gap:0;margin-top:6px}
+.prim{
+  display:grid;grid-template-columns:200px 1fr 210px;gap:24px;align-items:baseline;
+  padding:14px 0;border-bottom:1px solid var(--rule);
+}
+.prim:first-child{border-top:1px solid var(--rule)}
+.prim .n{font-family:Archivo,sans-serif;font-variation-settings:"wdth" 104,"wght" 600;font-size:19px}
+.prim .j{font-size:17px;color:var(--ink-2)}
+.prim .t{font-family:"IBM Plex Mono",monospace;font-size:13.5px;color:var(--ink-3);text-align:right}
+.prim.spine{background:var(--machine-soft);border-bottom-color:var(--machine-soft);padding-left:14px;padding-right:14px;margin:0 -14px}
+.prim.spine .n{color:var(--machine)}
+
+/* ---------- bullets ---------- */
+ul.pts{list-style:none;display:flex;flex-direction:column;gap:15px;margin-top:6px}
+ul.pts li{font-size:19px;line-height:1.45;color:var(--ink-2);padding-left:24px;position:relative;max-width:56ch}
+ul.pts li::before{
+  content:"";position:absolute;left:0;top:.62em;width:11px;height:2px;background:var(--machine);
+}
+ul.pts li b{color:var(--ink)}
+ul.pts.warn li::before{background:var(--human)}
+
+/* ---------- numbers / evidence ---------- */
+.figs{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;margin-top:26px}
+.fig .v{font-family:Archivo,sans-serif;font-variation-settings:"wdth" 100,"wght" 620;font-size:46px;line-height:1;letter-spacing:-.02em}
+.fig .l{margin-top:10px;font-size:15.5px;line-height:1.4;color:var(--ink-3)}
+.fig.hot .v{color:var(--human)}
+
+/* ---------- ladder ---------- */
+.ladder{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:20px;align-items:end}
+.rung{background:var(--panel);border-radius:2px;padding:18px 18px 20px;display:flex;flex-direction:column;gap:8px}
+.rung .s{font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--ink-3)}
+.rung .nm{font-family:Archivo,sans-serif;font-variation-settings:"wdth" 104,"wght" 600;font-size:20px;line-height:1.1}
+.rung .ct{font-size:16px;color:var(--machine);font-weight:500}
+.rung .bn{font-size:15.5px;color:var(--ink-2);line-height:1.38;margin-top:2px}
+.rung:nth-child(1){height:188px}
+.rung:nth-child(2){height:216px}
+.rung:nth-child(3){height:244px}
+.rung:nth-child(4){height:272px;background:var(--machine-soft)}
+.rung:nth-child(5){height:300px;background:var(--panel-2)}
+
+/* ---------- closing slide with QR ---------- */
+.closewrap{display:grid;grid-template-columns:1fr 268px;gap:64px;align-items:center}
+.closewrap .line{font-size:41px;line-height:1.12;max-width:none}
+.closewrap .after{margin-top:22px;font-size:19px}
+.actions{margin-top:34px;display:grid;grid-template-columns:repeat(3,1fr);gap:26px}
+.actions .flipaccent{font-size:16px;font-weight:500;margin-bottom:6px}
+.actions p.small{font-size:15px;line-height:1.45;max-width:none}
+.qr{text-align:center}
+.qrcard{background:#FFFFFF;border-radius:10px;padding:16px;display:inline-block;line-height:0}
+.qrcard img{width:216px;height:216px;display:block;image-rendering:pixelated}
+.qrlabel{margin-top:18px;font-size:17px;font-weight:600;color:var(--flip-fg)}
+.qrsub{margin-top:5px;font-size:14px;color:var(--flip-dim);line-height:1.4}
+
+/* ---------- demo ---------- */
+.demo{justify-content:center;align-items:flex-start}
+.demo h1{font-size:92px}
+.demo .note{margin-top:30px;font-size:20px;color:var(--ink-3);max-width:46ch;line-height:1.45}
+
+.slide.dense h2{font-size:37px}
+.slide.dense .kicker{margin-bottom:14px}
+.slide.dense ul.pts{gap:12px}
+.slide.dense ul.pts li{font-size:17.5px;line-height:1.42;max-width:52ch}
+.slide.dense p{font-size:18px;line-height:1.45}
+.slide.dense .panel{padding:18px 20px}
+.slide.dense .panel p{font-size:15.5px;line-height:1.42}
+.slide.tight .four .cell{padding:17px 19px;gap:7px}
+.slide.tight .four .cell p{font-size:15.5px;line-height:1.4}
+.slide.tight .four .cell .when{font-size:14px;padding-top:8px}
+.slide.tight h2{font-size:38px}
+
+/* ---------- notes panel ---------- */
+#notes{
+  display:none;background:#161C21;color:#C7D2D8;padding:16px 26px 18px;
+  border-top:1px solid #2C363C;max-height:31vh;overflow:auto;flex:none;
+}
+body.notes-on #notes{display:block}
+body.theme-dark{background:#080C0F}
+#notes .nh{font-size:12px;color:#6E8189;letter-spacing:.1em;margin-bottom:8px;font-family:"IBM Plex Mono",monospace}
+#notes .nb{font-size:15.5px;line-height:1.55;max-width:100ch}
+#notes .nb b{color:#EAF1F4}
+#notes .nb em{color:#7FB6BE;font-style:normal}
+.notes-src{display:none}
+
+/* ---------- right-hand drawer ---------- */
+#scrim{position:fixed;inset:0;background:rgba(8,12,15,.5);z-index:48;opacity:0;
+  pointer-events:none;transition:opacity .25s ease}
+body.menu-on #scrim{opacity:1;pointer-events:auto}
+
+#menu{
+  position:fixed;top:0;right:0;bottom:0;width:352px;z-index:52;
+  background:#121A20;color:#D7E1E6;border-left:1px solid #24313A;
+  transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);
+  display:flex;flex-direction:column;
+}
+body.menu-on #menu{transform:translateX(0)}
+#menu header{padding:26px 26px 18px;border-bottom:1px solid #24313A}
+#menu header h4{font-family:Archivo,sans-serif;font-weight:600;font-size:19px;color:#fff;letter-spacing:-.01em}
+#menu header p{font-size:12.5px;color:#7E8F98;margin-top:5px;max-width:none}
+#menu .scroll{flex:1;overflow-y:auto;padding:18px 16px 20px}
+#menu .grouphead{font-size:11px;letter-spacing:.14em;color:#61737D;padding:0 10px 9px;font-weight:500}
+#menu .group + .group{margin-top:22px;padding-top:20px;border-top:1px solid #1E2A32}
+
+.themerow{display:flex;gap:8px;padding:0 10px}
+.themerow button{
+  flex:1;padding:9px 0;border-radius:6px;border:1px solid #2A3841;background:transparent;
+  color:#9FB0B9;font-family:inherit;font-size:13px;cursor:pointer;transition:all .15s ease;
+}
+.themerow button:hover{border-color:#3C4E59;color:#D7E1E6}
+.themerow button.on{background:#0E6E7C;border-color:#0E6E7C;color:#fff}
+.themerow button:focus-visible{outline:2px solid #4FB3C4;outline-offset:2px}
+
+#menuList{list-style:none}
+#menuList li{display:flex;gap:12px;align-items:baseline;padding:8px 10px;border-radius:5px;
+  cursor:pointer;font-size:14px;color:#C3D0D7;transition:background .12s ease}
+#menuList li:hover{background:#1C262D}
+#menuList li.cur{background:#0E6E7C;color:#fff}
+#menuList li .i{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:#61737D;width:20px;flex:none}
+#menuList li.cur .i{color:#BFE6EB}
+#menuList li .t{flex:1;line-height:1.3}
+#menuList li .m{font-family:"IBM Plex Mono",monospace;font-size:11px;color:#61737D}
+#menuList li.cur .m{color:#BFE6EB}
+
+.reflist{list-style:none}
+.reflist a{display:block;padding:8px 10px;border-radius:5px;text-decoration:none;
+  color:#C3D0D7;font-size:13.5px;line-height:1.35;transition:background .12s ease}
+.reflist a:hover{background:#1C262D;color:#fff}
+.reflist a span{display:block;font-size:11.5px;color:#61737D;margin-top:2px}
+
+#menu footer{padding:14px 26px 20px;border-top:1px solid #24313A;font-size:11.5px;
+  color:#61737D;line-height:1.65}
+#menu footer b{color:#93A5AE;font-weight:500}
+
+#menuBtn{
+  position:fixed;top:20px;right:22px;z-index:46;width:42px;height:42px;border-radius:50%;
+  border:1px solid rgba(255,255,255,.22);background:rgba(16,23,28,.62);color:#E7EDF0;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;
+  opacity:0;transition:opacity .25s ease,background .15s ease;backdrop-filter:blur(6px);
+}
+body.chrome #menuBtn{opacity:1}
+body.menu-on #menuBtn{opacity:0;pointer-events:none}
+#menuBtn:hover{background:rgba(14,110,124,.9)}
+#menuBtn:focus-visible{outline:2px solid var(--machine);outline-offset:3px;opacity:1}
+#menuBtn svg{width:17px;height:17px;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+
+/* ---------- print / PDF export ---------- */
+@page{size:1280px 720px;margin:0}
+@media print{
+  /* always export light, whatever is on screen */
+  body.theme-dark{
+    --paper:#EDEFF1; --panel:#E3E7EA; --panel-2:#D9DEE2;
+    --ink:#10171C; --ink-2:#3D4A53; --ink-3:#6B777F;
+    --rule:#C6CFD5; --rule-soft:#D5DCE0;
+    --machine:#0E6E7C; --machine-soft:#CFE4E7; --human:#9A5B12; --human-soft:#EDE0CC;
+    --flip-bg:#10171C; --flip-fg:#F2F5F6; --flip-mute:#AEBBC2;
+    --flip-dim:#7E8F98; --flip-accent:#7FB6BE; --flip-rule:#2C363C; --flip-warm:#D9A45B;
+  }
+  body{background:#fff;overflow:visible;display:block}
+  #viewport{position:static;overflow:visible}
+  #stage{position:static;transform:none !important;left:0 !important;top:0 !important;width:1280px;height:auto;overflow:visible}
+  #rail,#bar,#notes,#menu,#scrim,#menuBtn,#nav,#pageNum,#blank{display:none !important}
+  .slide{display:flex !important;position:relative;width:1280px;height:720px;
+         page-break-after:always;break-after:page;animation:none !important;overflow:hidden}
+  .slide.divider,.slide.ink{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+
+/* ---------- progress ---------- */
+#bar{position:fixed;left:0;bottom:0;height:2px;background:var(--machine);z-index:40;transition:width .3s ease}
+body.notes-on #bar{display:none}
+
+/* ---------- page number ---------- */
+#pageNum{
+  position:fixed;right:24px;bottom:20px;height:42px;z-index:44;
+  display:flex;align-items:center;transition:right .25s ease;
+  font-family:"IBM Plex Mono",monospace;font-size:13px;color:#8598A1;
+  letter-spacing:.03em;user-select:none;pointer-events:none;
+}
+body.chrome #pageNum{right:186px}
+body.notes-on #pageNum{bottom:calc(31vh + 20px)}
+
+/* ---------- presenter controls ---------- */
+#nav{
+  position:fixed;right:22px;bottom:20px;z-index:45;display:flex;gap:10px;
+  opacity:0;transition:opacity .25s ease;
+}
+body.chrome #nav{opacity:1}
+#nav button{
+  width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.22);
+  background:rgba(16,23,28,.62);color:#E7EDF0;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;padding:0;
+  backdrop-filter:blur(6px);transition:background .15s ease,border-color .15s ease;
+}
+#nav button:hover{background:rgba(14,110,124,.9);border-color:rgba(255,255,255,.4)}
+#nav button:focus-visible{outline:2px solid var(--machine);outline-offset:3px}
+#nav button:disabled{opacity:.3;cursor:default}
+#nav svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.1;
+  stroke-linecap:round;stroke-linejoin:round}
+#fsBtn .ic-exit{display:none}
+body.fs-on #fsBtn .ic-enter{display:none}
+body.fs-on #fsBtn .ic-exit{display:block}
+body.notes-on #nav{bottom:calc(31vh + 20px)}
+
+#blank{position:fixed;inset:0;background:#000;z-index:60;display:none}
+body.blank-on #blank{display:block}
+
+#clock{
+  float:right;font-family:"IBM Plex Mono",monospace;font-size:12px;color:#8598A1;
+  letter-spacing:.04em;
+}
+#clock b{color:#E4EBEF;font-weight:500}
+#clock .off{color:#D9A45B}
+#clock .ok{color:#7FB6BE}
+</style>
+</head>
+<body>
+<div id="viewport">
+  <div id="stage">
+    <div id="rail">
+      <svg class="mark" viewBox="0 0 44 44">
+        <circle class="track" cx="22" cy="22" r="18"></circle>
+        <circle class="fill" cx="22" cy="22" r="18" transform="rotate(-90 22 22)" stroke-dasharray="0 113"></circle>
+      </svg>
+      <div class="actname" id="actname"></div>
+    </div>
+
+<!-- 1 TITLE -->
+<section class="slide title-slide flip" data-act="Open" data-time="1" data-title="Title">
+  <svg class="title-orbit" width="520" height="520" viewBox="0 0 520 520">
+    <circle cx="260" cy="260" r="228" fill="none" stroke="var(--flip-rule)" stroke-width="1.5"></circle>
+    <circle cx="260" cy="260" r="176" fill="none" stroke="var(--flip-rule)" stroke-width="1" opacity=".7"></circle>
+    <circle cx="260" cy="260" r="118" fill="none" stroke="var(--flip-rule)" stroke-width="1" opacity=".45"></circle>
+    <path d="M260 32 A228 228 0 0 1 445 391" fill="none" stroke="var(--flip-accent)" stroke-width="4.5"></path>
+    <path d="M433 372 L451 398 L423 402 Z" fill="var(--flip-accent)"></path>
+    <circle class="runner1" r="8" fill="var(--flip-warm)"></circle>
+    <circle class="runner2" r="6.5" fill="var(--flip-accent)"></circle>
+    <circle class="runner3" r="5.5" fill="var(--flip-warm)" opacity=".8"></circle>
+  </svg>
+  <h1>Loop engineering</h1>
+  <div class="sub">Nobody is prompting the agent any more. Something else is — and you have to build it.</div>
+  <div class="meta"><span>Nishant</span><span>10 September 2026</span></div>
+  <div class="notes-src"><b>Open cold.</b> "In the next 45 minutes I want to change what you think your job is when you sit down with a coding agent." Tell them the shape: what a loop is, where loops break, what's coming next, and a demo in the middle. <em>Show of hands: who has left an agent running for more than an hour without watching it?</em> Come back to that number at the end.</div>
+</section>
+
+<!-- 2 ABOUT ME -->
+<style>
+.aboutwrap .split{gap:48px}
+.aboutwrap .role{font-size:19px;color:var(--ink-2);margin:10px 0 30px}
+.aboutwrap .role b{color:var(--ink);font-weight:600}
+.aboutwrap .buildhead{font-size:13px;font-weight:500;color:var(--ink-3);letter-spacing:.02em;margin-bottom:14px}
+.aboutwrap .stack .panel h3{font-size:17px}
+.aboutwrap .stack .panel p{margin-top:4px}
+.aboutwrap .bridge{
+  margin-top:26px;background:var(--machine-soft);padding:18px 22px;border-radius:2px;
+  font-size:18px;color:var(--ink);line-height:1.4;
+}
+.aboutwrap .bridge b{font-weight:600}
+</style>
+<section class="slide aboutwrap" data-act="Open" data-time="1.3" data-title="About me">
+  <div class="kicker">Before the talk starts — quickly, who's talking</div>
+  <h2>Nishant Kumar</h2>
+  <div class="role"><b>Technical Architect</b> · Fintech &amp; Insurance · Norwich, UK</div>
+  <div class="body" style="justify-content:flex-start">
+    <div class="split">
+      <ul class="pts">
+        <li>18+ years building enterprise architecture in financial services</li>
+        <li>Leading AI-first modernisation on large-scale platforms</li>
+        <li>Certified across AWS, Azure and GCP</li>
+        <li>Micro-frontends, agentic AI, and protocols like MCP, A2A and ACP</li>
+        <li>Speaks regularly on emerging tech and AI architecture</li>
+      </ul>
+      <div>
+        <div class="buildhead">WHAT I'VE BEEN BUILDING</div>
+        <div class="stack">
+          <div class="panel"><h3>CloudCanvas</h3><p>Turns plain English into cloud architecture diagrams</p></div>
+          <div class="panel"><h3>CloudCopilot</h3><p>Copilot SDK plus MCP, for real-time pricing facts</p></div>
+          <div class="panel"><h3>TransitPulse</h3><p>A real-time, multi-modal transport tracker</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="bridge">Today: how I stopped arguing with Claude and started writing specs instead.</div>
+  </div>
+  <div class="foot"><span class="tag">Connect</span><span>linkedin.com/in/nishant7k · github.com/nishant7k</span></div>
+  <div class="notes-src">Keep this to sixty seconds — it's context, not the talk. The one line worth landing is the bridge at the bottom: <b>"I stopped arguing with Claude and started writing specs instead."</b> That's your own version of tonight's thesis, said before you've even introduced the term — <em>use it as the hinge into the cold open.</em> The MCP and agentic-AI line in the bullets isn't decoration: it's why you have standing to give this talk — you're not observing this trend, you're building inside it.</div>
+</section>
+
+<!-- 2 COLD OPEN -->
+<section class="slide statement" data-act="Open" data-time="1.5" data-title="Cold open">
+  <div class="body">
+    <div class="line">I typed one sentence and made coffee. By the time I got back, forty agents had done the work, checked each other, and left three pull requests waiting.</div>
+    <div class="after">I didn't write a single one of those prompts. Something else did. Building that something is the job now.</div>
+  </div>
+  <div class="foot"><span class="tag">Not unusual</span><span>plenty of people are working this way already, in Claude Code and in Codex</span></div>
+  <div class="notes-src">Tell it as a story, not a statistic, and <b>slow down</b>. They need to feel the gap before you name it. Then the turn: "Notice what's missing. There's no prompt in that story." <em>Beat.</em> "The prompts happened. Forty of them. A system wrote them." Don't define anything yet — that's two slides away.</div>
+</section>
+
+<!-- 3 QUOTES -->
+<style>
+.quoteslide .quotes{gap:40px}
+.quoteslide .qline{max-width:36ch;font-size:46px}
+.quoteslide .synth{
+  margin-top:8px;background:var(--machine-soft);padding:20px 24px;border-radius:2px;
+  font-size:20px;line-height:1.4;color:var(--ink);max-width:none;
+}
+</style>
+<section class="slide quoteslide" data-act="Open" data-time="1.5" data-title="Two quotes">
+  <div class="kicker">Two people, the same week, in June</div>
+  <div class="quotes">
+    <div>
+      <div class="qline">“My job is to write loops.”</div>
+      <div class="qwho"><b>Boris Cherny</b> — built Claude Code, now runs it at Anthropic</div>
+    </div>
+    <div>
+      <div class="qline">“You should be designing loops that prompt your agents.”</div>
+      <div class="qwho"><b>Peter Steinberger</b> — creator of OpenClaw</div>
+    </div>
+    <div class="synth">Neither one mentions the model. Both of them are talking about the job.</div>
+  </div>
+  <div class="foot"><span class="tag">6.5 million views in days</span><span>the name stuck because plenty of people were already doing this — it just hadn't been named yet</span></div>
+  <div class="notes-src">Read Cherny's line twice. Seven words, and it's a <b>job description</b>, not a tip. He isn't saying prompting got easier — he's saying he stopped doing it. Point out who these two are on purpose: they build the tools, so they hit the ceiling of typing prompts by hand first. Everyone else is getting there now. <em>Then land the synthesis line — pause before it. That's the reframe the rest of the talk rests on: this was never about the model getting smarter.</em></div>
+</section>
+
+<!-- 4 HOW WE GOT HERE -->
+<section class="slide" data-act="Origins" data-time="4" data-title="How we got here">
+  <div class="kicker">This didn't appear out of nowhere in June</div>
+  <h2 class="wide">Five steps, and one of them was just a bash script</h2>
+  <div class="body">
+    <div class="otimeline">
+      <div class="onode">
+        <div class="dot">1</div>
+        <div class="txt">
+          <div class="row"><span class="ttl">Prompt engineering</span><span class="dt">2022 – 2024</span></div>
+          <div class="desc">Get the wording right. You hold the tool the whole time.</div>
+        </div>
+      </div>
+      <div class="onode">
+        <div class="dot">2</div>
+        <div class="txt">
+          <div class="row"><span class="ttl">Context engineering</span><span class="dt">2025</span></div>
+          <div class="desc">Wording started to matter less than what the model could actually see.</div>
+        </div>
+      </div>
+      <div class="onode pivot">
+        <div class="dot">3</div>
+        <div class="txt">
+          <div class="row"><span class="ttl">The Ralph loop</span><span class="dt">Aug 2025</span></div>
+          <div class="desc">One engineer's bash script, feeding itself the same prompt on repeat: <span class="cmd">while :; do cat PROMPT.md | claude ; done</span>. Not clever — just relentless.</div>
+        </div>
+      </div>
+      <div class="onode">
+        <div class="dot">4</div>
+        <div class="txt">
+          <div class="row"><span class="ttl">Harness engineering</span><span class="dt">Early 2026</span></div>
+          <div class="desc">Build the workspace one agent lives in — its tools, its permissions, what it remembers.</div>
+        </div>
+      </div>
+      <div class="onode now">
+        <div class="dot">5</div>
+        <div class="txt">
+          <div class="row"><span class="ttl">Loop engineering ships</span><span class="dt">Mid 2026</span></div>
+          <div class="desc">Ralph's idea, productised. Every major tool now runs it as one command — <span class="cmd">/goal</span>.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="tag">None of these replaced the one before it</span><span>they stack — a bad prompt inside a good loop is still a bad prompt, just run four hundred times</span></div>
+  <div class="notes-src">This is the <b>spine of the talk</b> — take your time. Walk top to bottom and name what stopped being the hard part at each step. <b>Node three is the twist</b> — point at it and read the line out loud: <em>while true, cat the prompt file, run the agent, repeat.</em> That's it, that's the whole technique that started this. Nodes four and five are the labs turning that same scrappy idea into infrastructure — Ralph, formalised. Someone in the room is thinking "this is just cron." Say it out loud and promise to argue both sides later, on the "where loops break" slide.</div>
+</section>
+
+<!-- 5 WHAT A LOOP IS -->
+<section class="slide" data-act="Anatomy" data-time="2.5" data-title="What a loop is">
+  <div class="kicker">The definition the Claude Code team actually uses</div>
+  <div class="body">
+    <div class="qline" style="max-width:23ch;font-size:47px">An agent doing rounds of work until a condition you set becomes true.</div>
+    <div class="split" style="margin-top:44px;gap:40px">
+      <div class="panel line">
+        <h3>A prompt</h3>
+        <p style="margin-top:8px">Asks for the next thing. It does it, tells you, and stops. You judge it.</p>
+      </div>
+      <div class="panel accent">
+        <h3>A goal</h3>
+        <p style="margin-top:8px">Names something that has to be true. It keeps going until it is — or until it runs out of turns or money.</p>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="tag">The only real difference</span><span>who decides the work is finished</span></div>
+  <div class="notes-src">Say it, then <b>pause</b>. The words that matter are "a condition you set" — everything hard about this lives there. The line that lands: <em>"When you prompt, you are the stop condition. A loop just means you had to write it down."</em> That's usually the moment people realise this is harder than prompting, not easier.</div>
+</section>
+
+<!-- 6 INSIDE THE LOOP -->
+<style>
+.orbiter{offset-path:path("M 300 72 A 118 118 0 1 1 299.9 72");animation:orbit 7s linear infinite}
+.flowdot{offset-path:path("M500,127 L568,127 L568,158 L660,158 L660,186 L400,186 L400,161 L500,161 L500,127");animation:flow 5.6s linear infinite}
+@keyframes flow{to{offset-distance:100%}}
+.flowin{stroke-dasharray:6 7;animation:march 1.6s linear infinite}
+@keyframes march{to{stroke-dashoffset:-13}}
+@media (prefers-reduced-motion:reduce){.orbiter,.flowdot,.flowin{animation:none}}
+.exits{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:30px}
+.exits > div{display:flex;gap:11px;align-items:flex-start}
+.exits i{width:11px;height:11px;flex:none;margin-top:5px;display:block}
+.exits b{display:block;font-size:15.5px;color:var(--ink);font-weight:600;margin-bottom:3px}
+.exits span{font-size:13.5px;color:var(--ink-3);line-height:1.38;display:block}
+</style>
+<section class="slide" data-act="Anatomy" data-time="3.5" data-title="Inside the loop">
+  <div class="kicker">The same shape whether it runs for one minute or all night</div>
+  <h2 class="wide">What's actually happening inside</h2>
+  <div class="body">
+    <svg viewBox="0 0 1010 282" width="990" style="margin-top:4px">
+      <defs>
+        <marker id="fa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0 0 L10 5 L0 10 z" fill="var(--ink-3)"></path>
+        </marker>
+        <marker id="ft" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0 0 L10 5 L0 10 z" fill="var(--machine)"></path>
+        </marker>
+      </defs>
+
+      <rect x="245" y="26" width="520" height="178" rx="10" fill="none" stroke="var(--rule)" stroke-width="1.5" stroke-dasharray="6 6"></rect>
+      <text x="505" y="52" text-anchor="middle" font-size="14.5" fill="var(--ink-3)">the loop</text>
+
+      <rect x="10" y="98" width="170" height="58" rx="7" fill="var(--panel)"></rect>
+      <text x="95" y="133" text-anchor="middle" font-size="15.5" fill="var(--ink)">Your prompt</text>
+
+      <rect x="262" y="98" width="236" height="58" rx="7" fill="var(--machine-soft)"></rect>
+      <text x="380" y="123" text-anchor="middle" font-family="Archivo, Helvetica Neue, Arial, sans-serif" font-size="16" font-weight="600" fill="var(--ink)">It decides what to do</text>
+      <text x="380" y="143" text-anchor="middle" font-size="12.5" fill="var(--ink-2)">reads, plans, checks its work</text>
+
+      <rect x="575" y="98" width="170" height="58" rx="7" fill="var(--machine-soft)"></rect>
+      <text x="660" y="133" text-anchor="middle" font-family="Archivo, Helvetica Neue, Arial, sans-serif" font-size="16" font-weight="600" fill="var(--ink)">It runs a tool</text>
+
+      <rect x="800" y="216" width="180" height="58" rx="7" fill="var(--panel)"></rect>
+      <text x="890" y="251" text-anchor="middle" font-size="15.5" fill="var(--ink)">Final answer</text>
+
+      <path class="flowin" d="M182 127 H253" fill="none" stroke="var(--ink-3)" stroke-width="1.8" marker-end="url(#fa)"></path>
+      <path d="M500 127 H568" fill="none" stroke="var(--machine)" stroke-width="2" marker-end="url(#ft)"></path>
+      <text x="536" y="86" text-anchor="middle" font-size="12.5" fill="var(--ink-3)">wants a tool</text>
+
+      <path d="M660 158 V186 H400 V161" fill="none" stroke="var(--machine)" stroke-width="2" marker-end="url(#ft)"></path>
+      <text x="530" y="177" text-anchor="middle" font-size="12.5" fill="var(--ink-3)">the tool answers back</text>
+
+      <path d="M300 158 V246 H792" fill="none" stroke="var(--ink-3)" stroke-width="1.8" marker-end="url(#fa)"></path>
+      <text x="546" y="238" text-anchor="middle" font-size="12.5" fill="var(--ink-3)">no tool wanted — so it stops</text>
+
+      <circle class="flowdot" r="6.5" fill="var(--human)"></circle>
+    </svg>
+
+    <div class="exits">
+      <div><i style="background:var(--machine)"></i><div><b>It finished</b><span>you get the answer, the cost, and a session you can pick up again</span></div></div>
+      <div><i style="background:var(--human)"></i><div><b>It ran out of turns</b><span>no answer at all — resume it or raise the cap</span></div></div>
+      <div><i style="background:var(--human)"></i><div><b>It ran out of money</b><span>your spend cap stopped it, helpers counted in</span></div></div>
+      <div><i style="background:var(--human)"></i><div><b>It broke, or it said no</b><span>always check why before you trust what came out</span></div></div>
+    </div>
+  </div>
+  <div class="foot"><span class="tag">Three of those four are not success</span><span>most people design the happy path and let the rest surprise them at 3am</span></div>
+  <div class="notes-src">Trace the loop once with the dot: a prompt goes in, it decides what to do, it runs a tool, the result comes straight back to it, and round it goes. <b>The only way out is a turn where it doesn't want a tool.</b> That's the whole mechanism — everything else in this talk is about what you put around it. Then the real point: <b>three of those four endings are not success.</b> Most people design the happy path and let the other three surprise them at three in the morning. These are literally the four results the SDK hands back, and the answer text only exists on the first one. <em>"If your failure path is a Slack message nobody reads, that's not a loop, that's a leak."</em></div>
+</section>
+
+<!-- 7 FOUR HANDOFFS -->
+<section class="slide tight" data-act="Anatomy" data-time="3.5" data-title="Four ways to hand off">
+  <div class="kicker">Pick based on what you're willing to stop doing yourself</div>
+  <h2 class="wide">Four kinds of loop, and what you give up in each</h2>
+  <div class="body">
+    <div class="four">
+      <div class="cell">
+        <div class="hand">You give up — checking it</div>
+        <h3>Turn by turn</h3>
+        <p>Every prompt already loops — you're just the one judging each round. Write your checks into a skill and it can judge itself.</p>
+        <div class="when">Use it when you're still working out what you want</div>
+      </div>
+      <div class="cell">
+        <div class="hand">You give up — deciding when to stop</div>
+        <h3>Goal &nbsp;<span class="cmd">/goal</span></h3>
+        <p>Say what done looks like. A faster model checks after every round and sends it back if you're not there yet.</p>
+        <div class="when">Use it when done is something you can measure</div>
+      </div>
+      <div class="cell">
+        <div class="hand">You give up — starting it</div>
+        <h3>On a timer &nbsp;<span class="cmd">/loop</span> <span class="cmd">/schedule</span></h3>
+        <p>Same job, new inputs each time. Or you're watching something outside your control — a queue, a channel — and reacting when it changes.</p>
+        <div class="when">Use it when the work turns up on a clock, not from you</div>
+      </div>
+      <div class="cell">
+        <div class="hand">You give up — the prompt itself</div>
+        <h3>Left running</h3>
+        <p>All three, together. It wakes up, finds the work, fixes it, and only brings you what it's unsure about.</p>
+        <div class="when">Use it when the work repeats and you know it well</div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="tag">Start with the simplest one that works</span><span>most jobs never need the last one</span></div>
+  <div class="notes-src"><b>This is the slide people photograph.</b> Frame it as four rungs of letting go, not four features — at each one you hand over a bit more of your own judgement. Ask them to think of one job where <em>they</em> are the hold-up, and which of these four pieces they could give away tomorrow. Flag the bottom right: that's where the money goes and where unwatched mistakes live.</div>
+</section>
+
+<!-- 7B WHAT IT TAKES -->
+<section class="slide tight" data-act="Anatomy" data-time="3" data-title="What it takes">
+  <div class="kicker">Not theory — this is what decides whether a loop reaches production, or stays a demo</div>
+  <h2 class="wide">What it actually takes to get from prompt to a shipped outcome</h2>
+  <div class="body">
+    <div class="four" style="grid-template-columns:repeat(3,1fr)">
+      <div class="cell">
+        <div class="hand">Needed — 1</div>
+        <h3>Guardrails mined from your own work</h3>
+        <p>Rules pulled from your own review history, not the model's generic defaults. An agent judged against your team's real standard earns trust faster than one judged against a style guide nobody reads.</p>
+      </div>
+      <div class="cell">
+        <div class="hand">Needed — 2</div>
+        <h3>One path, wired end to end</h3>
+        <p>CLI, API, MCP — connect decision to action all the way through. Every handoff you leave for a human by hand is a place where the autonomy quietly stops.</p>
+      </div>
+      <div class="cell">
+        <div class="hand">Needed — 3</div>
+        <h3>Metrics on the outcome, not the activity</h3>
+        <p>Lines of code and PR counts stop meaning anything once an agent writes most of both. Track what shipped and stuck — not what was typed.</p>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="tag">None of this is optional</span><span>skip one pillar and the other two just produce more code, faster — not more trust</span></div>
+  <div class="notes-src">This is the checklist, not a story — three things that actually decide whether a loop reaches production or stays a demo. <b>Needed 1</b> is the trust problem: an agent that only knows generic best practices will always feel unsafe to hand real work to. <b>Needed 2</b> is the unglamorous truth — most of what makes a loop production-ready is plumbing, not model choice. <b>Needed 3</b> is the trap almost everyone falls into first: measuring activity because it's easy to count, right up until an agent can generate infinite activity. Land the foot line slowly — these three don't trade off against each other, they compound.</div>
+</section>
+
+<!-- 9 SIX PARTS -->
+<section class="slide" data-act="Anatomy" data-time="3" data-title="The six parts">
+  <div class="kicker">Every loop worth running is made of the same six things</div>
+  <h2 class="wide">Six parts, and the last one is the one people skip</h2>
+  <div class="body">
+    <div class="prims">
+      <div class="prim"><div class="n">Something that starts it</div><div class="j">Wakes it up on a schedule or when something happens. This is what makes it a loop and not a one-off</div><div class="t">/loop · /schedule · cron</div></div>
+      <div class="prim"><div class="n">Separate copies</div><div class="j">Its own checkout of the repo, so two agents working at once can't overwrite each other</div><div class="t">git worktree</div></div>
+      <div class="prim"><div class="n">Written-down rules</div><div class="j">Your project's conventions saved once, so it stops guessing them from scratch every run</div><div class="t">SKILL.md</div></div>
+      <div class="prim"><div class="n">Access to real tools</div><div class="j">Lets it reach where the work actually lives — tickets, builds, databases, chat</div><div class="t">MCP · plugins</div></div>
+      <div class="prim"><div class="n">A second agent</div><div class="j">One writes, a different one checks. Different instructions, often a different model</div><div class="t">sub-agents</div></div>
+      <div class="prim spine"><div class="n">A file that remembers</div><div class="j">What's done, what's next, what already failed — kept outside the conversation</div><div class="t">STATE.md · a Linear board</div></div>
+    </div>
+  </div>
+  <div class="foot"><span class="tag">Design for the parts, not the tool</span><span>Claude Code and Codex both have all six, under different names</span></div>
+  <div class="notes-src">Move quickly down the first five — the last one gets the next slide. The thing to say out loud: <b>a year ago you wrote all of this yourself in bash and maintained it forever.</b> Now it ships inside the products, which is exactly why this spread in weeks rather than years. And a warning worth giving: if your loop only works in one CLI, you've tied your process to somebody else's release schedule.</div>
+</section>
+
+<!-- 10 TWO THINGS -->
+<section class="slide dense" data-act="Anatomy" data-time="3" data-title="Two things that decide it">
+  <div class="kicker">If you remember two ideas from the whole talk, make it these</div>
+  <div class="body">
+    <div class="split" style="gap:48px">
+      <div>
+        <h2 style="font-size:34px;max-width:16ch;margin-bottom:18px">Never let it mark its own homework</h2>
+        <ul class="pts">
+          <li>The agent that wrote the code is a soft marker. It already believes its own reasoning.</li>
+          <li>A second agent starting fresh catches what the first one talked itself into.</li>
+          <li>Prefer checks a machine can settle — tests, types, a score. Cheaper, and harder to argue with.</li>
+          <li>Give it a hard problem and a visible test, and it will sometimes fix the test instead.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 style="font-size:34px;max-width:16ch;margin-bottom:18px">It forgets. Your repo doesn't.</h2>
+        <ul class="pts">
+          <li>Long runs get summarised as the window fills — including instructions you gave at the start.</li>
+          <li>So the rules live in files it re-reads every run, not in your opening message.</li>
+          <li>Keep what's done, what failed and what's next on disk. That's what lets tomorrow carry on from today.</li>
+          <li>Try it: kill the run halfway. If tomorrow can't tell where today stopped, you haven't got a loop.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="tag">Why the checker matters most</span><span>a loop runs while you're not watching, so the check is the only reason you can walk away</span></div>
+  <div class="notes-src">Analogy that always works for the left side: <em>reviewing your own pull request at six on a Friday.</em> Then sharpen it — the agent isn't lying, it's just working from its own assumptions, so a stern prompt won't fix it. A clean slate will. On the test-gaming point, don't say "the AI cheats" — say <b>"whatever you measure is what it optimises, so measure the outcome and not the proxy."</b> On the right side, lean into how unglamorous it is: <em>"the most advanced part of your autonomous system is going to be a text file, and you'll feel silly about that for about a week."</em></div>
+</section>
+
+<!-- 11 WHOLE LOOP -->
+<section class="slide" data-act="Anatomy" data-time="3.5" data-title="A whole loop">
+  <div class="kicker">Put together: the loop most teams should build first</div>
+  <h2 class="wide">A morning clean-up loop, start to finish</h2>
+  <div class="body">
+    <svg viewBox="0 0 1020 292" width="1000" style="margin-top:14px">
+      <defs>
+        <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="var(--ink-3)"></path></marker>
+        <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="var(--machine)"></path></marker>
+      </defs>
+      <g font-family="IBM Plex Sans, Helvetica Neue, Arial, sans-serif">
+        <rect x="90" y="6" width="211" height="78" fill="var(--panel)"></rect>
+        <text x="104" y="28" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="11.5" fill="var(--ink-3)">01</text>
+        <text x="104" y="48" font-family="Archivo, Helvetica Neue, Arial, sans-serif" font-size="16.5" font-weight="600" fill="var(--ink)">It starts on schedule</text>
+        <text x="104" y="68" font-size="13.5" fill="var(--ink-3)">cron, nobody watching</text>
+
+        <rect x="323" y="6" width="211" height="78" fill="var(--panel)"></rect>
+        <text x="337" y="28" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="11.5" fill="var(--ink-3)">02</text>
+        <text x="337" y="48" font-family="Archivo, Helvetica Neue, Arial, sans-serif" font-size="16.5" font-weight="600" fill="var(--ink)">It checks what changed</text>
+        <text x="337" y="68" font-size="13.5" fill="var(--ink-3)">builds, issues, commits</text>
+
+        <rect x="556" y="6" width="211" height="78" fill="var(--machine-soft)"></rect>
+        <text x="570" y="28" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="11.5" fill="var(--machine)">03</text>
+        <text x="570" y="48" font-family="Archivo, Helvetica Neue, Arial, sans-serif" font-size="16.5" font-weight="600" fill="var(--ink)">It logs what it found</text>
+        <text x="570" y="68" font-size="13.5" fill="var(--ink-2)">new since the last run</text>
+
+        <rect x="789" y="6" width="211" height="78" fill="var(--panel)"></rect>
+        <text x="803" y="28" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="11.5" fill="var(--ink-3)">04</text>
+        <text x="803" y="48" font-family="Archivo, Helvetica Neue, Arial, sans-serif" font-size="16.5" font-weight="600" fill="var(--ink)">Takes a private copy</text>
+        <text x="803" y="68" font-size="13.5" fill="var(--ink-3)">own branch, nothing shared</text>
+
+        <rect x="90" y="116" width="211" height="78" fill="var(--panel)"></rect>
+        <text x="104" y="138" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="11.5" fill="var(--ink-3)">05</text>
+        <text x="104" y="158" font-family="Archivo, Helvetica Neue, Arial, sans-serif" font-size="16.5" font-weight="600" fill="var(--ink)">One agent drafts a fix</text>
+        <text x="104" y="178" font-size="13.5" fill="var(--ink-3)">limited tools, capped turns</text>
+
+        <rect x="323" y="116" width="211" height="78" fill="var(--panel)"></rect>
+        <text x="337" y="138" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="11.5" fill="var(--ink-3)">06</text>
+        <text x="337" y="158" font-family="Archivo, Helvetica Neue, Arial, sans-serif" font-size="16.5" font-weight="600" fill="var(--ink)">A second agent checks</text>
+        <text x="337" y="178" font-size="13.5" fill="var(--ink-3)">fresh context, your tests</text>
+
+        <rect x="556" y="116" width="211" height="78" fill="var(--human-soft)"></rect>
+        <text x="570" y="138" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="11.5" fill="var(--human)">07</text>
+        <text x="570" y="158" font-family="Archivo, Helvetica Neue, Arial, sans-serif" font-size="16.5" font-weight="600" fill="var(--ink)">A gate decides</text>
+        <text x="570" y="178" font-size="13.5" fill="var(--ink-2)">safe ships, risky waits</text>
+
+        <rect x="789" y="116" width="211" height="78" fill="var(--panel)"></rect>
+        <text x="803" y="138" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="11.5" fill="var(--ink-3)">08</text>
+        <text x="803" y="158" font-family="Archivo, Helvetica Neue, Arial, sans-serif" font-size="16.5" font-weight="600" fill="var(--ink)">You get a pull request</text>
+        <text x="803" y="178" font-size="13.5" fill="var(--ink-3)">or the full story, for you</text>
+
+        <path d="M301 45 H319" stroke="var(--ink-3)" stroke-width="1.6" marker-end="url(#a2)" fill="none"></path>
+        <path d="M534 45 H552" stroke="var(--ink-3)" stroke-width="1.6" marker-end="url(#a2)" fill="none"></path>
+        <path d="M767 45 H785" stroke="var(--ink-3)" stroke-width="1.6" marker-end="url(#a2)" fill="none"></path>
+        <path d="M1000 45 H1010 V100 H80 V155 H86" stroke="var(--ink-3)" stroke-width="1.6" marker-end="url(#a2)" fill="none" stroke-dasharray="4 4"></path>
+        <path d="M301 155 H319" stroke="var(--ink-3)" stroke-width="1.6" marker-end="url(#a2)" fill="none"></path>
+        <path d="M534 155 H552" stroke="var(--ink-3)" stroke-width="1.6" marker-end="url(#a2)" fill="none"></path>
+        <path d="M767 155 H785" stroke="var(--ink-3)" stroke-width="1.6" marker-end="url(#a2)" fill="none"></path>
+
+        <path d="M894 194 V246 H46 V46 H84" stroke="var(--machine)" stroke-width="2.4" marker-end="url(#a3)" fill="none"></path>
+        <text x="470" y="238" text-anchor="middle" font-size="14" fill="var(--machine)">tomorrow it reads the same file and carries on from here</text>
+        <text x="470" y="278" text-anchor="middle" font-size="14.5" fill="var(--ink-3)">You set this up once. You prompted none of it.</text>
+      </g>
+    </svg>
+  </div>
+  <div class="notes-src">Walk it once at pace, then stop on <b>07</b>. The gate is the bit every demo skips and every real loop needs. Say what's on each side: dependency bumps, changelog entries and flaky tests go through; anything touching login, payments, migrations or infrastructure comes to a person. And when it comes to you it has to bring <em>the whole story</em>, not a red cross — otherwise you've built a machine that generates work for humans. Finish on the teal arrow: that's what turns eight steps into a loop.</div>
+</section>
+
+<!-- 12 WHERE IT BREAKS -->
+<section class="slide dense" data-act="Reality" data-time="3.5" data-title="Where it breaks">
+  <div class="kicker">What happens when people actually run these for a month</div>
+  <h2 class="wide">Four ways this goes wrong, and one fair argument against it</h2>
+  <div class="body">
+    <div class="split" style="margin-top:18px;gap:48px">
+      <div>
+        <ul class="pts warn">
+          <li><b>The bill.</b> Helpers multiply the calls. Loops left running overnight with no cap have run up four-figure bills.</li>
+          <li><b>It wanders.</b> Long runs drift off the goal and still report success. Plenty of people got better work by staying involved.</li>
+          <li><b>You stop knowing your own code.</b> The faster it ships work you didn't write, the wider that gap gets.</li>
+          <li><b>Review jams up.</b> An MIT study this year found far more code written and only a fraction more shipped. Writing stopped being the hard part.</li>
+        </ul>
+      </div>
+      <div class="stack">
+        <div class="panel line">
+          <h3>The argument against</h3>
+          <p style="margin-top:10px">One engineer's take: the loop was a stopgap while the tools caught up. <span class="cmd">/goal</span> is the proof — what you hand-built now ships as one command.</p>
+          <p style="margin-top:12px">He's partly right. Most things people call loops are cron jobs and webhooks with a model in the middle.</p>
+        </div>
+        <div class="panel accent">
+          <p>What survives: something still has to define done, track progress, and decide when to stop. That didn't vanish into the command — it moved into your design.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes-src">Say this straight, with no defensiveness — the credibility you buy here is what makes the last section land. <b>Have your own number ready</b> for what a nightly loop costs you a week. If you haven't got one, say so and tell them to measure before they scale. On the sceptic: agree with him in public, then draw the line — <em>the command got easier, the design didn't.</em> Anyone who has written a stop condition that actually stops knows the difference.</div>
+</section>
+
+<!-- 13 DEMO -->
+<section class="slide demo flip" data-act="Reality" data-time="6" data-title="Demo">
+  <div class="body">
+    <div class="kicker">Live</div>
+    <h1>Let's watch one run</h1>
+    <div class="note">A real repo, a measurable goal, one agent writing and another checking — plus gates deciding what ships.</div>
+  </div>
+  <div class="notes-src"><b>Demo discipline:</b> narrate three things and nothing else — the condition you typed, the checker disagreeing with the writer, and the state file afterwards. Say the cost out loud when it finishes; the room is already wondering. <em>If it stalls, cut to the recording immediately — don't debug on stage.</em> Six minutes, hard stop.</div>
+</section>
+
+<!-- 14 WHAT'S NEXT -->
+<section class="slide tight" data-act="Next" data-time="3" data-title="What's next">
+  <div class="kicker">The hard part keeps moving — it's already past “can the model do it”</div>
+  <h2 class="wide">What's coming in the next year</h2>
+  <div class="body">
+    <div class="four" style="margin-top:10px">
+      <div class="cell">
+        <div class="hand">Checking gets formal</div>
+        <h3>Eval engineering</h3>
+        <p>Your checker becomes a versioned test set you score against, built partly from real failures. Expect this to become a job title within the year.</p>
+      </div>
+      <div class="cell">
+        <div class="hand">One loop becomes many</div>
+        <h3>Graph engineering</h3>
+        <p>A loop is one agent's behaviour; a graph is the org chart joining many. Right now, one strong planner directing cheaper workers wins on cost.</p>
+      </div>
+      <div class="cell">
+        <div class="hand">Running lots of them at once</div>
+        <h3>Fleet engineering</h3>
+        <p>Once you're running dozens, the questions get operational: who owns this, what it cost, who can turn it off. Registries, budgets, a kill switch.</p>
+      </div>
+      <div class="cell">
+        <div class="hand">The organisation catches up</div>
+        <h3>Everything downstream</h3>
+        <p>Review and release, rebuilt around agent output instead of typing speed. Logins and permissions for things that aren't people. Per-seat pricing gets odd once the seats aren't staff.</p>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="tag">Notice the pattern</span><span>every one of these is a way to control something we already made too fast</span></div>
+  <div class="notes-src">Roughly 50 seconds each. Anchor each one in something real rather than a prediction: eval tooling already has a vendor market, graph engineering got named in July, fleet tooling exists today, and the last one is what Anthropic describes doing internally. If someone asks which matters most for their team, say <b>eval engineering</b> without hesitating — it's the one that makes everything above it safe. Also worth saying plainly: don't chase the layer being talked about online. Fix the one you're standing on.</div>
+</section>
+
+<!-- 15 LADDER -->
+<section class="slide" data-act="Next" data-time="2.5" data-title="Where's your team">
+  <div class="kicker">Published by the person who built Claude Code, July 2026</div>
+  <h2 class="wide">Where your team actually is — and what unlocks the next step</h2>
+  <div class="body">
+    <div class="ladder">
+      <div class="rung"><div class="s">step 0</div><div class="nm">Gated</div><div class="ct">no agents</div><div class="bn">Approval layers and old models. The bottleneck is policy.</div></div>
+      <div class="rung"><div class="s">step 1</div><div class="nm">Assisted</div><div class="ct">~1 per engineer</div><div class="bn">You pair with it and watch every step. The bottleneck is your attention.</div></div>
+      <div class="rung"><div class="s">step 2</div><div class="nm">Parallel</div><div class="ct">~10 per engineer</div><div class="bn">AI writes, humans verify. The bottleneck is review capacity.</div></div>
+      <div class="rung"><div class="s">step 3</div><div class="nm">Supervised autonomy</div><div class="ct">~100</div><div class="bn">AI verifies AI; humans handle exceptions. This is where loops are mandatory.</div></div>
+      <div class="rung"><div class="s">step 4</div><div class="nm">AI-native</div><div class="ct">1,000+</div><div class="bn">The system chooses the work; you steer by intent. The bottleneck is trust.</div></div>
+    </div>
+  </div>
+  <div class="foot"><span class="tag">The point of the ladder</span><span>tokens don't move you up a step — finding the next bottleneck and building the next guardrail does</span></div>
+  <div class="notes-src">Two things to say plainly. First, <b>it isn't one score</b> — your docs pipeline can sit at step 3 while anything touching payments stays at step 1, and picking the right level per job <em>is</em> the maturity. Second, most rooms are split-level: officially step 1, quietly step 2 because three people are already doing it. Naming that usually gets a laugh and a lot of nodding. <em>Optional: show of hands per step, so the room diagnoses itself.</em></div>
+</section>
+
+<!-- 16 CLOSING -->
+<section class="slide flip" data-act="Close" data-time="3" data-title="Thank you">
+  <div class="body">
+    <div class="closewrap">
+      <div>
+        <div class="line">Two people build the same loop. One uses it to go faster on work they understand. The other uses it to avoid understanding the work.</div>
+        <div class="after">“The loop doesn't know the difference. You do.” &nbsp;— Addy Osmani</div>
+        <div class="actions">
+          <div><div class="flipaccent">Monday</div><p class="small">Pick one job you're still doing entirely by hand, and hand off a piece of it.</p></div>
+          <div><div class="flipaccent">This month</div><p class="small">Write the check before the loop, and cap the turns and spend from day one.</p></div>
+          <div><div class="flipaccent">This quarter</div><p class="small">Place yourself on that ladder, and build the guardrail for your real bottleneck.</p></div>
+        </div>
+      </div>
+      <div class="qr">
+        <div class="qrcard"><img alt="QR code linking to Nishant's LinkedIn profile" src="data:image/png;base64,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"></div>
+        <div class="qrlabel">Let's stay in touch</div>
+        <div class="qrsub">Scan to connect with me on LinkedIn</div>
+      </div>
+    </div>
+  </div>
+  <div class="notes-src">Slow right down. The three columns are the <b>only homework</b> — say them as instructions, not suggestions. Then the last line, unhurried: <em>"Building the loop is the cure when you do it with judgement, and the accelerant when you do it to avoid thinking. Same action. Opposite result."</em> Call back to the show of hands from the start if it landed, then stop talking. Leave this slide up for questions so people can scan the code while they think. Have an answer ready for the five you'll get: what does it cost, how do you stop it gaming the tests, does it work on legacy code, what happens to code review, and can I point it at production.</div>
+</section>
+
+  </div><!-- /stage -->
+</div><!-- /viewport -->
+
+<div id="notes"><div class="nh"><span id="clock"></span>speaker notes</div><div class="nb" id="notesBody"></div></div>
+<div id="blank"></div>
+<div id="nav">
+  <button id="prevBtn" aria-label="Previous slide"><svg viewBox="0 0 24 24"><polyline points="15 5 8 12 15 19"></polyline></svg></button>
+  <button id="nextBtn" aria-label="Next slide"><svg viewBox="0 0 24 24"><polyline points="9 5 16 12 9 19"></polyline></svg></button>
+  <button id="fsBtn" aria-label="Enter fullscreen">
+    <svg class="ic-enter" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+    <svg class="ic-exit" viewBox="0 0 24 24"><path d="M9 3v3a2 2 0 0 1-2 2H4M15 3v3a2 2 0 0 0 2 2h3M4 15h3a2 2 0 0 1 2 2v3M20 15h-3a2 2 0 0 0-2 2v3"></path></svg>
+  </button>
+</div>
+<div id="bar"></div>
+<div id="pageNum"></div>
+
+<button id="menuBtn" aria-label="Open menu">
+  <svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+</button>
+<div id="scrim"></div>
+<aside id="menu" aria-label="Presentation menu">
+  <header>
+    <h4>Loop engineering</h4>
+    <p id="menuMeta"></p>
+  </header>
+  <div class="scroll">
+    <div class="group">
+      <div class="grouphead">APPEARANCE</div>
+      <div class="themerow">
+        <button id="lightBtn">Light</button>
+        <button id="darkBtn">Dark</button>
+      </div>
+    </div>
+    <div class="group">
+      <div class="grouphead">SLIDES</div>
+      <ol id="menuList"></ol>
+    </div>
+    <div class="group">
+      <div class="grouphead">REFERENCE MATERIAL</div>
+      <!-- Add your own links here: copy one <li> block and change the href, title and note. -->
+      <ul class="reflist">
+        <li><a href="https://claude.com/blog/getting-started-with-loops" target="_blank" rel="noopener">Getting started with loops<span>Anthropic — the four loop types, in their own words</span></a></li>
+        <li><a href="https://code.claude.com/docs/en/agent-sdk/agent-loop" target="_blank" rel="noopener">How the agent loop works<span>Claude docs — turns, tool calls, budgets, exits</span></a></li>
+        <li><a href="https://addyosmani.com/blog/loop-engineering/" target="_blank" rel="noopener">Loop engineering<span>Addy Osmani — the five parts and the spine</span></a></li>
+        <li><a href="https://newsletter.pragmaticengineer.com/p/what-is-loop-engineering" target="_blank" rel="noopener">What is loop engineering?<span>The Pragmatic Engineer — the sceptical read</span></a></li>
+        <li><a href="https://github.com/cobusgreyling/loop-engineering" target="_blank" rel="noopener">loop-engineering<span>GitHub — seven patterns you can clone today</span></a></li>
+        <li><a href="https://www.infoq.com/presentations/autonomous-ai-software-development-roblox/" target="_blank" rel="noopener">Autonomous SDLC at Roblox<span>InfoQ — Andrew Swerdlow, prompt to production at enterprise scale</span></a></li>
+        <li><a href="https://ghuntley.com/ralph/" target="_blank" rel="noopener">Ralph Wiggum as a software engineer<span>Geoffrey Huntley — where the whole idea started</span></a></li>
+      </ul>
+    </div>
+  </div>
+  <footer>
+    <b>Move</b> &nbsp;← → space PageUp PageDown<br>
+    <b>S</b> speaker notes &nbsp;·&nbsp; <b>D</b> light or dark<br>
+    <b>B</b> blank the screen &nbsp;·&nbsp; <b>F</b> fullscreen &nbsp;·&nbsp; <b>M</b> this menu
+  </footer>
+</aside>
+
+</div>
+
+<script>
+(function(){
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var stage = document.getElementById('stage');
+  var viewport = document.getElementById('viewport');
+  var i = 0;
+
+
+  // move speaker notes out of the stage so they never render on the slide
+  slides.forEach(function(s){
+    var n = s.querySelector('.notes-src');
+    s._notes = n ? n.innerHTML : '';
+    if(n) n.remove();
+  });
+
+  function fit(){
+    var w = viewport.clientWidth, h = viewport.clientHeight;
+    var s = Math.min(w/1280, h/720);
+    stage.style.transform = 'scale(' + s + ')';
+    stage.style.left = Math.max(0,(w - 1280*s)/2) + 'px';
+    stage.style.top  = Math.max(0,(h - 720*s)/2) + 'px';
+  }
+
+  function show(n){
+    i = Math.max(0, Math.min(slides.length-1, n));
+    slides.forEach(function(s,k){ s.classList.toggle('on', k===i); });
+    var s = slides[i];
+    document.getElementById('actname').textContent = s.dataset.act || '';
+    document.getElementById('rail').classList.toggle('dark', s.classList.contains('flip'));
+    var pct = slides.length>1 ? i/(slides.length-1) : 1;
+    document.querySelector('#rail .fill').setAttribute('stroke-dasharray', (113*pct).toFixed(1)+' 113');
+    document.getElementById('bar').style.width = (pct*100)+'%';
+    document.getElementById('pageNum').textContent = i+1;
+    document.getElementById('notesBody').innerHTML = s._notes || '<span style="color:#6E8189">No notes on this slide.</span>';
+    Array.prototype.forEach.call(document.querySelectorAll('#menuList li'), function(li,k){
+      li.classList.toggle('cur', k===i);
+    });
+    location.hash = i+1;
+    var pb = document.getElementById('prevBtn'), nb = document.getElementById('nextBtn');
+    if(pb){ pb.disabled = (i===0); nb.disabled = (i===slides.length-1); }
+    if(typeof started !== 'undefined' && started === null && i > 0) started = Date.now();
+    if(typeof tick === 'function') tick();
+  }
+
+  // drawer: slide list with cumulative start times
+  var list = document.getElementById('menuList'), acc = 0;
+  slides.forEach(function(s,k){
+    var li = document.createElement('li');
+    var mins = Math.floor(acc), secs = Math.round((acc-mins)*60);
+    li.innerHTML = '<span class="i">'+(k+1)+'</span><span class="t">'+(s.dataset.title||'')+
+                   '</span><span class="m">'+mins+':'+(secs<10?'0':'')+secs+'</span>';
+    li.addEventListener('click', function(){ show(k); closeMenu(); });
+    list.appendChild(li);
+    acc += parseFloat(s.dataset.time || 2);
+  });
+  document.getElementById('menuMeta').textContent =
+    slides.length + ' slides · ' + Math.round(acc) + ' minutes · cumulative start times';
+
+  // drawer open / close and the theme switch
+  function openMenu(){ document.body.classList.add('menu-on'); }
+  function closeMenu(){ document.body.classList.remove('menu-on'); }
+  function toggleMenu(){ document.body.classList.toggle('menu-on'); }
+  document.getElementById('menuBtn').addEventListener('click', function(e){ e.stopPropagation(); openMenu(); });
+  document.getElementById('scrim').addEventListener('click', function(e){ e.stopPropagation(); closeMenu(); });
+  document.getElementById('menu').addEventListener('click', function(e){ e.stopPropagation(); });
+
+  var lightBtn = document.getElementById('lightBtn'), darkBtn = document.getElementById('darkBtn');
+  function setTheme(dark){
+    document.body.classList.toggle('theme-dark', dark);
+    lightBtn.classList.toggle('on', !dark);
+    darkBtn.classList.toggle('on', dark);
+  }
+  lightBtn.addEventListener('click', function(e){ e.stopPropagation(); setTheme(false); });
+  darkBtn.addEventListener('click', function(e){ e.stopPropagation(); setTheme(true); });
+  setTheme(false);
+
+  var NEXT = ['ArrowRight','ArrowDown',' ','Spacebar','PageDown','Enter','n','N'];
+  var PREV = ['ArrowLeft','ArrowUp','PageUp','Backspace','p','P'];
+
+  document.addEventListener('keydown', function(e){
+    if(e.metaKey || e.ctrlKey || e.altKey) return;
+    var k = e.key;
+    if(document.body.classList.contains('blank-on') && k !== 'Escape' && k !== 'b' && k !== 'B'
+       && NEXT.indexOf(k) < 0 && PREV.indexOf(k) < 0) return;
+    if(NEXT.indexOf(k) > -1){ e.preventDefault(); document.body.classList.remove('blank-on'); show(i+1); }
+    else if(PREV.indexOf(k) > -1){ e.preventDefault(); document.body.classList.remove('blank-on'); show(i-1); }
+    else if(k==='Home'){ show(0); }
+    else if(k==='End'){ show(slides.length-1); }
+    else if(k==='s' || k==='S'){ document.body.classList.toggle('notes-on'); setTimeout(fit,0); }
+    else if(k==='m' || k==='M' || k==='o' || k==='O'){ toggleMenu(); }
+    else if(k==='b' || k==='B' || k==='.'){ document.body.classList.toggle('blank-on'); }
+    else if(k==='r' || k==='R'){ started = null; tick(); }
+    else if(k==='d' || k==='D'){ setTheme(!document.body.classList.contains('theme-dark')); }
+    else if(k==='f' || k==='F'){ toggleFullscreen(); }
+    else if(k==='Escape'){
+      if(isFullscreen()) exitFullscreen();  // native Esc already does this; kept as a safety net
+      closeMenu();
+      document.body.classList.remove('blank-on');
+    }
+  });
+
+  document.getElementById('nextBtn').addEventListener('click', function(e){ e.stopPropagation(); show(i+1); });
+  document.getElementById('prevBtn').addEventListener('click', function(e){ e.stopPropagation(); show(i-1); });
+
+  // fullscreen — vendor-prefixed for older Safari, synced to a body class so
+  // the on-screen icon, aria-label and slide scale all agree with reality
+  function isFullscreen(){
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+  function enterFullscreen(){
+    var el = document.documentElement;
+    (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+  }
+  function exitFullscreen(){
+    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  }
+  function toggleFullscreen(){ isFullscreen() ? exitFullscreen() : enterFullscreen(); }
+  function syncFullscreenState(){
+    var on = isFullscreen();
+    document.body.classList.toggle('fs-on', on);
+    var btn = document.getElementById('fsBtn');
+    if(btn) btn.setAttribute('aria-label', on ? 'Exit fullscreen' : 'Enter fullscreen');
+    fit();
+  }
+  document.getElementById('fsBtn').addEventListener('click', function(e){ e.stopPropagation(); toggleFullscreen(); });
+  document.addEventListener('fullscreenchange', syncFullscreenState);
+  document.addEventListener('webkitfullscreenchange', syncFullscreenState);
+
+  // presenter chrome fades in on pointer movement, out again when still
+  var chromeTimer=null;
+  function wakeChrome(){
+    document.body.classList.add('chrome');
+    clearTimeout(chromeTimer);
+    chromeTimer = setTimeout(function(){ document.body.classList.remove('chrome'); }, 2600);
+  }
+  ['mousemove','pointerdown','touchstart'].forEach(function(ev){
+    document.addEventListener(ev, wakeChrome, {passive:true});
+  });
+  wakeChrome();
+
+  // elapsed timer, compared against the planned running order
+  var started = null, planned = [], run = 0;
+  slides.forEach(function(s){ planned.push(run); run += parseFloat(s.dataset.time || 2); });
+  function mmss(sec){
+    sec = Math.max(0, Math.round(sec));
+    var m = Math.floor(sec/60), s = sec%60;
+    return m + ':' + (s<10?'0':'') + s;
+  }
+  function tick(){
+    var el = document.getElementById('clock');
+    if(!el) return;
+    if(started === null){ el.innerHTML = 'timer starts on the first advance'; return; }
+    var secs = (Date.now() - started)/1000;
+    var target = planned[i]*60;
+    var diff = secs - target;
+    var state = Math.abs(diff) < 60
+      ? '<span class="ok">on plan</span>'
+      : '<span class="off">' + mmss(Math.abs(diff)) + (diff>0 ? ' behind' : ' ahead') + '</span>';
+    el.innerHTML = '<b>' + mmss(secs) + '</b> elapsed &nbsp;·&nbsp; ' + state +
+                   ' &nbsp;·&nbsp; ' + Math.round(run) + ' min total';
+  }
+  setInterval(tick, 1000);
+
+  viewport.addEventListener('click', function(e){
+    if(document.body.classList.contains('menu-on')){ closeMenu(); return; }
+    if(document.body.classList.contains('blank-on')){ document.body.classList.remove('blank-on'); return; }
+    show(e.clientX < viewport.clientWidth*0.22 ? i-1 : i+1);
+  });
+
+  var tx=null;
+  viewport.addEventListener('touchstart', function(e){ tx = e.changedTouches[0].clientX; }, {passive:true});
+  viewport.addEventListener('touchend', function(e){
+    if(tx===null) return;
+    var d = e.changedTouches[0].clientX - tx;
+    if(Math.abs(d)>44) show(d<0 ? i+1 : i-1);
+    tx=null;
+  }, {passive:true});
+
+  window.addEventListener('resize', fit);
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+
+  fit();
+  var start = parseInt((location.hash||'').replace('#',''),10);
+  show(isNaN(start) ? 0 : start-1);
+})();
+</script>
+</body>
+</html>
