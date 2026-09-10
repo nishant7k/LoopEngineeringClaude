@@ -28,7 +28,13 @@ the security gate — that's a deliberate, visible difference, not a bug.
 ## What this demonstrates
 
 - A small real-time feed app (`src/index.html`, `src/css/styles.css`,
-  `src/js/app.js`) as the subject of the loop.
+  `src/js/app.js`, `src/js/globe.js`) as the subject of the loop — live ISS
+  position via `wheretheiss.at`, plus a tracked-satellite globe (Hubble,
+  Tiangong, Starlink) plotted from cached Celestrak TLEs. The live handshake
+  is gated behind [`src/feature-flags.json`](src/feature-flags.json)`#liveFeed`:
+  flipping that flag (a real commit → push → CI → deploy) is the
+  live-implementation demo hook — while it's off, the UI shows an explicit
+  "not yet implemented, ask the loop" state instead of faking the feature.
 - A spec-driven process: [`specs/AIDLC-SPEC.md`](specs/AIDLC-SPEC.md)
   defines the loop methodology; [`specs/FEATURE-SPEC-realtime-feed.md`](specs/FEATURE-SPEC-realtime-feed.md)
   defines the feature under iteration.
@@ -51,6 +57,17 @@ open src/index.html
 # or, to serve it over HTTP (needed for the feature-flags.json fetch):
 cd src && python3 -m http.server
 ```
+
+## Lint & test locally
+
+```bash
+npm run test:design   # design tokens + accessibility baseline, zero deps, ~200ms
+npm run test:e2e      # real headless-Chromium e2e test (Playwright); self-serves over HTTP
+npx playwright install --with-deps chromium   # one-time, if not already installed
+```
+
+Both run as CI jobs (`Lint & Design Standards`, `Test`) on every push and
+PR — running them locally first catches the same failures before you push.
 
 ## CI/CD pipeline
 
@@ -79,6 +96,21 @@ Defined in [`.github/workflows/security-review.yml`](.github/workflows/security-
 every pull request is scanned by [`anthropics/claude-code-security-review`](https://github.com/anthropics/claude-code-security-review),
 an AI-powered, diff-aware security reviewer that comments findings directly
 on the PR.
+
+[`SECURITY-POLICY.md`](SECURITY-POLICY.md) is the threat model fed to the
+scanner as both scan context and false-positive filtering guidance (full
+rationale in [`specs/FEATURE-SPEC-security-loop.md`](specs/FEATURE-SPEC-security-loop.md)).
+It's a living document, not a fixed rulebook: a `/security-fp <reason>`
+comment on a PR triggers [`security-policy-update.yml`](.github/workflows/security-policy-update.yml),
+which appends a new precedent and opens a PR against `main` with just that
+one change — it only ever edits the policy doc, never application code, and
+still goes through the normal checks-gated merge.
+
+[`security/eval-fixtures/`](security/eval-fixtures/) holds intentionally
+vulnerable snippets (never imported by the app, never bundled into `dist/`)
+that exist solely to prove a policy edit didn't overreach into suppressing
+a real bug class — see [`security/eval-fixtures/README.md`](security/eval-fixtures/README.md)
+for the recall-check runbook.
 
 ### Watching the loop live
 
